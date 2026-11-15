@@ -18,6 +18,7 @@ type PlayData = {
     art_url: string | null;
     talk_about_it: string[];
     new_words: { word: string; say_as: string }[];
+    grownup_fact: string | null;
   };
   items: Item[];
   sfx: Record<string, string>;
@@ -194,6 +195,12 @@ function Player() {
       </button>
       {grownUp && (
         <section className="card space-y-5">
+          {data.episode.grownup_fact && (
+            <div className="rounded-2xl bg-sky/15 p-3">
+              <h2 className="text-lg font-semibold">Did you know? (for you)</h2>
+              <p className="mt-1">{data.episode.grownup_fact}</p>
+            </div>
+          )}
           {data.episode.talk_about_it.length > 0 && (
             <div>
               <h2 className="text-xl font-semibold">Talk about it</h2>

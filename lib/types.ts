@@ -64,6 +64,7 @@ export type Script = {
   segments: Segment[];
   art_prompt: string;
   talk_about_it: string[];
+  grownup_fact?: string;
 };
 
 export type Fact = { id: string; fact: string; source_url: string; source_title?: string };

@@ -103,6 +103,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       art_url: ep.art_path ? publicUrl(ep.art_path) : null,
       talk_about_it: ep.talk_about_it ?? [],
       new_words: script.new_words ?? [],
+      grownup_fact: script.grownup_fact ?? null,
     },
     items,
     sfx,

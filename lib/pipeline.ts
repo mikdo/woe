@@ -130,7 +130,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
         const { claims } = await claudeJson<{ claims: string[] }>({
           model: config.claudeFast,
           system: CLAIMS_SYSTEM,
-          user: JSON.stringify(script.segments),
+          user: JSON.stringify({ segments: script.segments, grownup_fact: script.grownup_fact ?? null }),
           maxTokens: 3000,
         });
         checks = await checkClaims(ep.question, claims);

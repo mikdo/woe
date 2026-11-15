@@ -70,6 +70,19 @@ STRUCTURE (one segment per beat, in this order)
 9 teaser: "What do you think we'll wonder about next time?"
 10 signoff: "Keep asking questions, and stay curious!" Cheko changes back. sfx "jingle".
 
+TWO AUDIENCES (the Bluey / Pixar approach)
+The kids are the audience; the grown-up listening in the car or at bedtime should enjoy it too. Add a quiet second layer that never gets in the kids' way:
+- Wit that works on two levels: wordplay, gentle irony, and Otto's dry understatement next to Cheko's over-the-top excitement. Kids laugh at Cheko; grown-ups smile at Otto.
+- Running gags and callbacks: set something up early and pay it off later (a word, a Cheko mishap, a "don't say it…").
+- One genuinely surprising fact a grown-up won't know, told simply so kids get it too.
+- A small moment of heart: wonder, kindness, or the joy of not knowing yet.
+- Warmth about family life (snacks, bedtime, "are we there yet?") that parents recognise.
+Guardrails:
+- Every line must still make sense to a child; the grown-up layer is a bonus, never a requirement.
+- No sarcasm aimed at anyone, no innuendo, no jokes about parents being tired or kids being annoying, no pop-culture references that date, no brand names.
+- Keep it light: about one grown-up wink per segment at most, fewer for Littles.
+- Clarity first. If a joke would confuse the explanation, cut the joke.
+
 RULES
 - NEVER use any child's name. The app adds a personal hello separately.
 - Use ONLY the provided facts for any factual claim. List the fact ids each segment relies on in "facts".
@@ -81,12 +94,13 @@ RULES
 - Category must be one of: ${CATEGORY_LIST}. ${FORM_RULES}.
 - art_prompt: a cover scene for the topic in one or two sentences, no people's faces needed, no text.
 - talk_about_it: 3 short prompts a parent can use afterwards at dinner or in the car.
+- grownup_fact: one extra "did you know?" for the grown-up, one or two sentences, from the provided facts.
 
 Return ONLY JSON:
 {"title":"Why Is the Sky Blue?","category":"earth","cheko_form":"dragon",
  "new_words":[{"word":"scatter","say_as":"SCAT-er"}],
  "segments":[{"beat":"hello","lines":[{"speaker":"otto","text":"..."},{"speaker":"cheko","text":"..."}],"facts":[],"pause_after_s":0,"sfx":"jingle","answer":null}],
- "art_prompt":"...","talk_about_it":["...","...","..."]}`;
+ "art_prompt":"...","talk_about_it":["...","...","..."],"grownup_fact":"..."}`;
 }
 
 export function scriptUser(question: string, facts: Fact[]) {
@@ -95,7 +109,7 @@ export function scriptUser(question: string, facts: Fact[]) {
 
 export const CLAIMS_SYSTEM = `List every checkable factual claim in this children's episode script, including the correct answers of every game
 (e.g. "True or false: sharks have bones. Answer: false" becomes the claim "Sharks do not have bones").
-Skip greetings, opinions, jokes and the transformation bits. Return ONLY JSON: {"claims":["...","..."]}`;
+Include facts tucked inside jokes and the grownup_fact. Skip greetings, opinions and the transformation bits. Return ONLY JSON: {"claims":["...","..."]}`;
 
 export function fixUser(script: Script, problems: ClaimCheck[], facts: Fact[]) {
   return `This script failed the fact check. Rewrite ONLY what is needed so every claim is correct or removed, keeping the same structure, tone and JSON format.
