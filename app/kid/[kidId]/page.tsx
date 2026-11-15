@@ -33,7 +33,18 @@ export default function KidPage() {
   const router = useRouter();
   const { session } = useSession();
   const { kids } = useFamily(Boolean(session));
-  const kid = kids.find((k) => k.id === kidId);
+  const isAll = kidId === "all";
+  const kid = isAll
+    ? kids.length
+      ? {
+          id: "all",
+          name: "All of us",
+          colour: kids[0].colour,
+          avatar: "👨‍👧‍👦",
+          age: Math.min(...kids.map((k) => k.age)),
+        }
+      : undefined
+    : kids.find((k) => k.id === kidId);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [gate, setGate] = useState(false);
   const [typed, setTyped] = useState<string | null>(null);
@@ -43,12 +54,13 @@ export default function KidPage() {
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadShelf = useCallback(async () => {
-    const { data } = await supabase()
+    let q = supabase()
       .from("family_library")
       .select("favourite, episodes(id, title, question, category, art_path, cheko_form, status)")
-      .eq("kid_id", kidId)
       .order("added_at", { ascending: false })
       .limit(24);
+    if (kidId !== "all") q = q.eq("kid_id", kidId);
+    const { data } = await q;
     setShelf(((data ?? []) as unknown as { favourite: boolean; episodes: EpisodeLite }[]).map((r) => ({ ...r.episodes, favourite: r.favourite })).filter((e) => e?.status === "ready"));
   }, [kidId]);
 
@@ -159,7 +171,7 @@ export default function KidPage() {
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 p-6" style={{ background: `linear-gradient(${kid.colour}22, transparent 40%)` }}>
       <header className="flex items-center justify-between">
         <Link href="/" className="btn-soft px-4 py-2 text-base">← Home</Link>
-        <span className="font-display text-2xl font-bold">{kid.name}</span>
+        <span className="font-display text-2xl font-bold">{isAll ? kids.map((k) => k.name).join(" + ") : kid.name}</span>
       </header>
 
       <section className="flex flex-1 flex-col items-center justify-center gap-6 py-6 text-center">
@@ -175,6 +187,9 @@ export default function KidPage() {
               🎤
             </button>
             <p className="text-slate-500">Tap and ask your question</p>
+            <button className="btn-soft" onClick={() => (isGrownUpUnlocked() ? setTyped("") : setGate(true))}>
+              ⌨️ Grown-up types it
+            </button>
           </>
         )}
 
@@ -225,15 +240,9 @@ export default function KidPage() {
         )}
       </section>
 
-      {phase.kind === "idle" && (
-        <button className="self-center text-sm font-semibold text-slate-500 underline" onClick={() => (isGrownUpUnlocked() ? setTyped("") : setGate(true))}>
-          Grown-up types it
-        </button>
-      )}
-
       {typed !== null && (
         <div className="card space-y-3">
-          <label className="block text-sm font-semibold text-slate-600">{kid.name}&apos;s question, in their words</label>
+          <label className="block text-sm font-semibold text-slate-600">{isAll ? "The question" : `${kid.name}'s question`}, in their words</label>
           <input className="input" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Why do cats purr?" />
           <div className="flex justify-end gap-2">
             <button className="btn-soft" onClick={() => setTyped(null)}>Cancel</button>
@@ -254,7 +263,7 @@ export default function KidPage() {
 
       {shelf.length > 0 && phase.kind === "idle" && (
         <section className="space-y-3">
-          <h2 className="text-2xl font-bold">{kid.name}&apos;s shelf</h2>
+          <h2 className="text-2xl font-bold">{isAll ? "Our shelf" : `${kid.name}'s shelf`}</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {shelf.map((e) => (
               <EpisodeCard key={e.id} episode={e} href={`/e/${e.id}?kid=${kid.id}`} />

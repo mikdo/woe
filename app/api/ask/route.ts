@@ -16,14 +16,15 @@ export async function POST(req: Request) {
   const text = (body.text ?? "").trim().slice(0, 300);
   if (!text) return Response.json({ error: "No question" }, { status: 400 });
 
-  const { data: kid } = await db()
-    .from("kids")
-    .select("*")
-    .eq("id", body.kidId ?? "")
-    .eq("family_id", auth.family.id)
-    .maybeSingle();
-  if (!kid) return Response.json({ error: "Pick who is asking" }, { status: 400 });
-  const band: Band = body.band ?? bandForAge(kid.age);
+  const { data: famKids } = await db().from("kids").select("*").eq("family_id", auth.family.id);
+  const allKids = famKids ?? [];
+  const forAll = body.kidId === "all";
+  const kid = forAll ? null : allKids.find((k) => k.id === body.kidId);
+  if (!forAll && !kid) return Response.json({ error: "Pick who is asking" }, { status: 400 });
+  if (forAll && allKids.length === 0) return Response.json({ error: "Add a kid first" }, { status: 400 });
+  // Listening together uses the youngest kid's band.
+  const youngest = Math.min(...(forAll ? allKids : [kid!]).map((k) => k.age));
+  const band: Band = body.band ?? bandForAge(youngest);
 
   const t = await triage(text, band);
   const status =
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
     .from("asks")
     .insert({
       family_id: auth.family.id,
-      kid_id: kid.id,
+      kid_id: kid?.id ?? null,
+      for_all: forAll,
       text: t.question || text,
       source: body.source ?? "voice",
       band,

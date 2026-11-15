@@ -1,5 +1,5 @@
 import { requireFamily, db, publicUrl, signedUrl } from "@/lib/supabase/admin";
-import { ensurePersonalClips } from "@/lib/pipeline";
+import { ensureGroupClips, ensurePersonalClips, joinNames } from "@/lib/pipeline";
 import type { Script, Fact, ClaimCheck } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -34,12 +34,30 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const sfx = Object.fromEntries(KIT.map((k) => [k, publicUrl(`kit/${k}.mp3`)]));
 
   let kid: { id: string; family_id: string; name: string; name_say_as: string | null; age: number } | null = null;
-  if (kidId) {
+  if (kidId && kidId !== "all") {
     const { data } = await db().from("kids").select("*").eq("id", kidId).eq("family_id", auth.family.id).maybeSingle();
     kid = data;
   }
   let clips: { intro_path: string | null; outro_path: string | null } | null = null;
-  if (kid) {
+  let hello = "";
+  if (kidId === "all") {
+    const { data: ask } = await db()
+      .from("asks")
+      .select("id")
+      .eq("family_id", auth.family.id)
+      .eq("for_all", true)
+      .eq("episode_id", id)
+      .eq("created_new", true)
+      .limit(1);
+    clips = await ensureGroupClips(auth.family.id, id, Boolean(ask?.length)).catch(() => null);
+    const { data: fk } = await db().from("kids").select("name").eq("family_id", auth.family.id).order("created_at");
+    hello = joinNames((fk ?? []).map((k) => k.name));
+    await db()
+      .from("family_library")
+      .upsert({ family_id: auth.family.id, episode_id: id }, { onConflict: "family_id,episode_id", ignoreDuplicates: true });
+    await db().from("plays").insert({ family_id: auth.family.id, episode_id: id });
+  } else if (kid) {
+    hello = kid.name;
     const { data: ask } = await db()
       .from("asks")
       .select("id")
@@ -56,7 +74,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (clips?.intro_path) {
     const url = await signedUrl(clips.intro_path);
-    if (url) items.push({ url, pause_after_s: 0.4, caption: `Hello, ${kid!.name}!`, kind: "intro" });
+    if (url) items.push({ url, pause_after_s: 0.4, caption: `Hello, ${hello}!`, kind: "intro" });
   }
   for (const seg of script.segments) {
     if (!seg.audio_path) continue;
@@ -69,7 +87,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
   if (clips?.outro_path) {
     const url = await signedUrl(clips.outro_path);
-    if (url) items.push({ url, pause_after_s: 0, caption: `Bye, ${kid!.name}!`, kind: "outro" });
+    if (url) items.push({ url, pause_after_s: 0, caption: `Bye, ${hello}!`, kind: "outro" });
   }
 
   const facts = (ep.facts?.facts ?? []) as Fact[];

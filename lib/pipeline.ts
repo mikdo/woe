@@ -238,7 +238,9 @@ export async function finishAsk(askId: string, episodeId: string) {
   await db()
     .from("family_library")
     .upsert({ family_id: ask.family_id, episode_id: episodeId, kid_id: ask.kid_id }, { onConflict: "family_id,episode_id" });
-  if (ask.kid_id) {
+  if (ask.for_all) {
+    await ensureGroupClips(ask.family_id, episodeId, ask.created_new);
+  } else if (ask.kid_id) {
     const { data: kid } = await db().from("kids").select("*").eq("id", ask.kid_id).single();
     if (kid) await ensurePersonalClips(kid as Kid, episodeId, ask.created_new);
   }
@@ -268,6 +270,33 @@ export async function ensurePersonalClips(kid: Kid, episodeId: string, askedByTh
   const row = { kid_id: kid.id, episode_id: episodeId, intro_path: introPath, outro_path: outroPath };
   await db().from("personal_clips").upsert(row, { onConflict: "kid_id,episode_id" });
   return row;
+}
+
+export function joinNames(names: string[]) {
+  if (names.length <= 1) return names[0] ?? "friends";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** One intro/outro that names every kid in the family, for "All of us" listening. */
+export async function ensureGroupClips(familyId: string, episodeId: string, askedByThem: boolean) {
+  const introPath = `${familyId}/all/${episodeId}-intro.mp3`;
+  const outroPath = `${familyId}/all/${episodeId}-outro.mp3`;
+  const { data: existing } = await db().storage.from("personal").list(`${familyId}/all`, { search: episodeId });
+  if ((existing ?? []).length >= 2) return { intro_path: introPath, outro_path: outroPath };
+
+  const { data: kids } = await db().from("kids").select("*").eq("family_id", familyId).order("created_at");
+  const list = (kids ?? []) as Kid[];
+  const names = joinNames(list.map((k) => k.name_say_as || k.name));
+  const band: Band = list.some((k) => k.age <= 3) ? "littles" : "bigs";
+  const rules = await pronunciationRules(familyId);
+  const say = (lines: { speaker: "otto" | "cheko"; text: string }[]) =>
+    speak(lines.map((l) => ({ ...l, text: applyAliases(l.text, rules) })));
+  const [intro, outro] = await Promise.all([say(introLines(names, band, askedByThem)), say(outroLines(names))]);
+  await Promise.all([
+    upload("personal", introPath, intro, "audio/mpeg"),
+    upload("personal", outroPath, outro, "audio/mpeg"),
+  ]);
+  return { intro_path: introPath, outro_path: outroPath };
 }
 
 /** Adds the new wording as a variant so future asks can match it. */

@@ -54,6 +54,15 @@ export default function Library() {
       {kids.length > 1 && (
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-500">Listening:</span>
+          <button
+            className={`rounded-full px-4 py-1.5 font-display text-lg ${kidId === "all" ? "bg-ink text-white" : "bg-white"}`}
+            onClick={() => {
+              setKidId("all");
+              localStorage.setItem("woe-kid", "all");
+            }}
+          >
+            All of us
+          </button>
           {kids.map((k) => (
             <button
               key={k.id}

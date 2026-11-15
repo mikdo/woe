@@ -49,6 +49,16 @@ export default function Home() {
             <span className="font-display text-3xl font-bold">{k.name}</span>
           </Link>
         ))}
+        {kids.length > 1 && (
+          <Link
+            href="/kid/all"
+            className="col-span-2 flex items-center justify-center gap-3 rounded-[2rem] py-6 text-white shadow-[0_6px_0_rgba(0,0,0,.15)] transition active:scale-95"
+            style={{ background: `linear-gradient(90deg, ${kids.map((k) => k.colour).join(", ")})` }}
+          >
+            <span className="text-5xl">👨‍👧‍👦</span>
+            <span className="font-display text-3xl font-bold">All of us</span>
+          </Link>
+        )}
       </section>
 
       <Link href="/library" className="btn-soft self-center text-xl">📚 Our WOE! library</Link>

@@ -120,7 +120,7 @@ export function introLines(name: string, band: Band, askedByThem: boolean) {
 
 export function outroLines(name: string) {
   return [
-    { speaker: "otto" as const, text: `Great listening, ${name}! You're a super curious kid.` },
+    { speaker: "otto" as const, text: `Great listening, ${name}! Super curious work.` },
     { speaker: "cheko" as const, text: `Bye ${name}! Stay curious!` },
   ];
 }
