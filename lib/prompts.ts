@@ -95,12 +95,23 @@ RULES
 - art_prompt: a cover scene for the topic in one or two sentences, no people's faces needed, no text.
 - talk_about_it: 3 short prompts a parent can use afterwards at dinner or in the car.
 - grownup_fact: one extra "did you know?" for the grown-up, one or two sentences, from the provided facts.
+- activities: exactly 3 things to do afterwards that continue the learning, each a different kind:
+  "make" (a craft or build from things most homes have: paper, cardboard, tape, pegs, playdough, pots, pillows),
+  "move" (a walk, the backyard or the playground: pretend play, a hunt, acting it out, e.g. "be a volcano on the slide"),
+  "explore" (look, listen, touch or sort something real at home, in the garden or on a walk) or "draw".
+  Each: title (fun, 2-5 words), minutes (5-30), need (short list, may be empty), steps (3-5 short steps for the grown-up),
+  talk (one question to ask while doing it, using the episode's new word), safety (one line or null).
+  Activity safety: Littles - nothing small enough to swallow, no scissors, no balloons. Any age - no heat, flames, cooking,
+  sharp tools, chemicals, cleaning products, or water play without a grown-up watching. Baking soda and vinegar only with a grown-up.
+  Never send kids anywhere unsupervised. Prefer free, low-mess, five-minutes-to-set-up ideas.
+  Sign-off: Otto mentions there's a WOE! activity to try with a grown-up.
 
 Return ONLY JSON:
 {"title":"Why Is the Sky Blue?","category":"earth","cheko_form":"dragon",
  "new_words":[{"word":"scatter","say_as":"SCAT-er"}],
  "segments":[{"beat":"hello","lines":[{"speaker":"otto","text":"..."},{"speaker":"cheko","text":"..."}],"facts":[],"pause_after_s":0,"sfx":"jingle","answer":null}],
- "art_prompt":"...","talk_about_it":["...","...","..."],"grownup_fact":"..."}`;
+ "art_prompt":"...","talk_about_it":["...","...","..."],"grownup_fact":"...",
+ "activities":[{"kind":"make","title":"...","minutes":10,"need":["..."],"steps":["...","..."],"talk":"...","safety":null}]}`;
 }
 
 export function scriptUser(question: string, facts: Fact[]) {

@@ -5,7 +5,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
 import { useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
-import { CATEGORIES, type ClaimCheck } from "@/lib/types";
+import { CATEGORIES, type Activity, type ClaimCheck } from "@/lib/types";
 
 type Item = { url: string; pause_after_s: number; caption: string; kind: string };
 type PlayData = {
@@ -19,6 +19,7 @@ type PlayData = {
     talk_about_it: string[];
     new_words: { word: string; say_as: string }[];
     grownup_fact: string | null;
+    activities: Activity[];
   };
   items: Item[];
   sfx: Record<string, string>;
@@ -46,6 +47,7 @@ function Player() {
   const [showWords, setShowWords] = useState(false);
   const [grownUp, setGrownUp] = useState(false);
   const [fav, setFav] = useState(false);
+  const [activity, setActivity] = useState<number | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   const modeRef = useRef<Mode>("idle");
   const idxRef = useRef(0);
@@ -183,6 +185,27 @@ function Player() {
       {mode === "pause" && <p className="text-center font-display text-2xl">🤔 What do you think?</p>}
       {mode === "done" && <p className="text-center font-display text-2xl">Stay curious! 🌏</p>}
 
+      {data.episode.activities.length > 0 && (
+        <section className={`card space-y-3 ${mode === "done" ? "ring-4 ring-sun" : ""}`}>
+          <h2 className="text-center text-2xl font-bold">Let&apos;s do something!</h2>
+          <div className="grid grid-cols-3 gap-2">
+            {data.episode.activities.map((a, i) => (
+              <button
+                key={i}
+                onClick={() => setActivity(activity === i ? null : i)}
+                className={`flex flex-col items-center gap-1 rounded-2xl p-3 text-center transition active:scale-95 ${activity === i ? "bg-sun text-white" : "bg-orange-50"}`}
+              >
+                <span className="text-4xl">{ACTIVITY_ICON[a.kind] ?? "✨"}</span>
+                <span className="font-display text-sm font-semibold leading-tight">{a.title}</span>
+              </button>
+            ))}
+          </div>
+          {activity !== null && data.episode.activities[activity] && (
+            <ActivityDetail a={data.episode.activities[activity]} />
+          )}
+        </section>
+      )}
+
       <button className="self-center text-sm font-semibold text-slate-500 underline" onClick={() => setShowWords((s) => !s)}>
         {showWords ? "Hide the words" : "Show the words"}
       </button>
@@ -242,5 +265,31 @@ function Player() {
         </section>
       )}
     </main>
+  );
+}
+
+const ACTIVITY_ICON: Record<string, string> = { make: "✂️", move: "🏃", explore: "🔍", draw: "🖍️" };
+
+function ActivityDetail({ a }: { a: Activity }) {
+  return (
+    <div className="space-y-2 rounded-2xl bg-white p-3 ring-1 ring-orange-100">
+      <p className="text-sm text-slate-500">For grown-ups · about {a.minutes} min</p>
+      {a.need.length > 0 && (
+        <p>
+          <span className="font-semibold">You need: </span>
+          {a.need.join(", ")}
+        </p>
+      )}
+      <ol className="list-decimal space-y-1 pl-5">
+        {a.steps.map((s, i) => (
+          <li key={i}>{s}</li>
+        ))}
+      </ol>
+      <p className="rounded-xl bg-sky/15 p-2">
+        <span className="font-semibold">Ask: </span>
+        {a.talk}
+      </p>
+      {a.safety && <p className="text-sm text-amber-700">⚠️ {a.safety}</p>}
+    </div>
   );
 }

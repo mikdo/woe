@@ -65,6 +65,17 @@ export type Script = {
   art_prompt: string;
   talk_about_it: string[];
   grownup_fact?: string;
+  activities?: Activity[];
+};
+
+export type Activity = {
+  kind: "make" | "move" | "explore" | "draw";
+  title: string;
+  minutes: number;
+  need: string[];
+  steps: string[];
+  talk: string;
+  safety?: string | null;
 };
 
 export type Fact = { id: string; fact: string; source_url: string; source_title?: string };
