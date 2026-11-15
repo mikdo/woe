@@ -115,7 +115,7 @@ export default function Setup() {
             <div>
               <label className="block text-sm font-semibold text-slate-600">Age</label>
               <div className="mt-1 flex flex-wrap gap-2">
-                {[2, 3, 4, 5, 6, 7, 8].map((a) => (
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((a) => (
                   <button key={a} className={`h-12 w-12 rounded-full font-display text-xl ${draft.age === a ? "bg-sun text-white" : "bg-orange-50"}`} onClick={() => setDraft({ ...draft, age: a })}>
                     {a}
                   </button>

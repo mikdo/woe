@@ -24,7 +24,7 @@ export async function embed(text: string): Promise<number[]> {
 
 /** Independent fact check with Google Search grounding. */
 export async function checkClaims(question: string, claims: string[]): Promise<ClaimCheck[]> {
-  const prompt = `You are a careful fact checker for a science show for children aged 2-6.
+  const prompt = `You are a careful fact checker for a science show for children aged 2-10.
 The episode answers: "${question}".
 Check EVERY claim below using Google Search. Children's simplifications are fine if they are not false.
 Verdicts: "supported" (true as stated), "simplified_ok" (simplified for kids but not false),

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CATEGORIES } from "@/lib/types";
+import { BANDS, CATEGORIES } from "@/lib/types";
 
 export type EpisodeLite = {
   id: string;
@@ -9,6 +9,7 @@ export type EpisodeLite = {
   art_path: string | null;
   cheko_form: string | null;
   status: string;
+  band?: string | null;
   favourite?: boolean;
 };
 
@@ -30,6 +31,14 @@ export function EpisodeCard({ episode, href }: { episode: EpisodeLite; href: str
           <div className="grid h-full place-items-center text-6xl">{cat?.emoji ?? "🌏"}</div>
         )}
         {episode.favourite && <span className="absolute right-2 top-2 text-2xl">⭐</span>}
+        {(() => {
+          const b = BANDS.find((x) => x.id === episode.band);
+          return b ? (
+            <span className="absolute bottom-2 left-2 rounded-full px-2.5 py-0.5 text-xs font-bold text-white" style={{ background: b.colour }}>
+              {b.label} {b.ages}
+            </span>
+          ) : null;
+        })()}
       </div>
       <p className="p-3 font-display text-base font-semibold leading-tight">{episode.title ?? episode.question}</p>
     </Link>

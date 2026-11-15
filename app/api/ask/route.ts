@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   if (forAll && allKids.length === 0) return Response.json({ error: "Add a kid first" }, { status: 400 });
   // Listening together uses the youngest kid's band.
   const youngest = Math.min(...(forAll ? allKids : [kid!]).map((k) => k.age));
-  const band: Band = body.band ?? bandForAge(youngest);
+  const band: Band = body.band && ["littles", "bigs", "explorers"].includes(body.band) ? body.band : bandForAge(youngest);
 
   const t = await triage(text, band);
   const status =

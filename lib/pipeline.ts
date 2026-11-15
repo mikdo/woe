@@ -16,7 +16,7 @@ import {
   scriptSystem,
   scriptUser,
 } from "@/lib/prompts";
-import type { Band, Category, ChekoForm, ClaimCheck, Fact, Script } from "@/lib/types";
+import { bandForAge, type Band, type Category, type ChekoForm, type ClaimCheck, type Fact, type Script } from "@/lib/types";
 
 type Triage = {
   verdict: "ok" | "needs_grownup" | "not_suitable" | "unclear";
@@ -256,7 +256,7 @@ export async function ensurePersonalClips(kid: Kid, episodeId: string, askedByTh
     .maybeSingle();
   if (existing?.intro_path && existing?.outro_path) return existing;
   const name = kid.name_say_as || kid.name;
-  const band: Band = kid.age <= 3 ? "littles" : "bigs";
+  const band: Band = bandForAge(kid.age);
   const rules = await pronunciationRules(kid.family_id);
   const say = (lines: { speaker: "otto" | "cheko"; text: string }[]) =>
     speak(lines.map((l) => ({ ...l, text: applyAliases(l.text, rules) })));
@@ -287,7 +287,7 @@ export async function ensureGroupClips(familyId: string, episodeId: string, aske
   const { data: kids } = await db().from("kids").select("*").eq("family_id", familyId).order("created_at");
   const list = (kids ?? []) as Kid[];
   const names = joinNames(list.map((k) => k.name_say_as || k.name));
-  const band: Band = list.some((k) => k.age <= 3) ? "littles" : "bigs";
+  const band: Band = bandForAge(Math.min(...list.map((k) => k.age)));
   const rules = await pronunciationRules(familyId);
   const say = (lines: { speaker: "otto" | "cheko"; text: string }[]) =>
     speak(lines.map((l) => ({ ...l, text: applyAliases(l.text, rules) })));

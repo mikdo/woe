@@ -7,6 +7,8 @@ import { useFamily, useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
+import { BandPicker } from "@/components/BandPicker";
+import { bandForAge, type Band } from "@/lib/types";
 
 type Phase =
   | { kind: "idle" }
@@ -49,6 +51,7 @@ export default function KidPage() {
   const [gate, setGate] = useState(false);
   const [typed, setTyped] = useState<string | null>(null);
   const [shelf, setShelf] = useState<EpisodeLite[]>([]);
+  const [bandChoice, setBandChoice] = useState<Band | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,7 +59,7 @@ export default function KidPage() {
   const loadShelf = useCallback(async () => {
     let q = supabase()
       .from("family_library")
-      .select("favourite, episodes(id, title, question, category, art_path, cheko_form, status)")
+      .select("favourite, episodes(id, title, question, category, art_path, cheko_form, status, band)")
       .order("added_at", { ascending: false })
       .limit(24);
     if (kidId !== "all") q = q.eq("kid_id", kidId);
@@ -109,7 +112,7 @@ export default function KidPage() {
     try {
       const r = await api<{ askId: string; status: string; episodeId?: string; reason?: string }>("/api/ask", {
         method: "POST",
-        body: JSON.stringify({ kidId, text, source }),
+        body: JSON.stringify({ kidId, text, source, band }),
       });
       handleStatus(r.askId, r.status, r.episodeId ?? null, r.reason);
     } catch (e) {
@@ -166,6 +169,7 @@ export default function KidPage() {
   }, [thinking?.askId]);
 
   if (!kid) return null;
+  const band: Band = bandChoice ?? bandForAge(kid.age);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 p-6" style={{ background: `linear-gradient(${kid.colour}22, transparent 40%)` }}>
@@ -187,6 +191,7 @@ export default function KidPage() {
               🎤
             </button>
             <p className="text-slate-500">Tap and ask your question</p>
+            <BandPicker value={band} onChange={(b) => b && setBandChoice(b)} />
             <button className="btn-soft" onClick={() => (isGrownUpUnlocked() ? setTyped("") : setGate(true))}>
               ⌨️ Grown-up types it
             </button>

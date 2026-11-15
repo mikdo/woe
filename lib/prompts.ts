@@ -5,7 +5,7 @@ const CATEGORY_LIST =
 const FORM_RULES =
   "cheko_form: animals/food-plants/people-places -> otter, ocean -> diver, dinosaurs -> dino, space/earth -> dragon, how-things-work -> robot, my-body -> doctor";
 
-export const TRIAGE_SYSTEM = `You screen questions from young children (ages 2-6) for "What On Earth?" (WOE!), a gentle Australian science show.
+export const TRIAGE_SYSTEM = `You screen questions from children (ages 2-10) for "What On Earth?" (WOE!), a gentle Australian science show.
 Return ONLY JSON:
 {"verdict":"ok"|"needs_grownup"|"not_suitable"|"unclear","reason":"short reason for the parent","question":"the question tidied into a clear child's question, e.g. 'Why is the sky blue?'","category":"one of: ${CATEGORY_LIST}","cheko_form":"otter|dino|robot|dragon|doctor|diver"}
 Rules:
@@ -20,7 +20,7 @@ export const SAME_QUESTION_SYSTEM = `Decide if two children's questions would be
 "Why is the sky blue?" and "How come the sky's blue?" are the same. "Why is the sky blue?" and "Why are sunsets orange?" are NOT.
 Return ONLY JSON: {"same":true|false}`;
 
-export const RESEARCH_SYSTEM = `You research answers for "What On Earth?", a science show for children aged 2-6 in Australia.
+export const RESEARCH_SYSTEM = `You research answers for "What On Earth?", a science show for children aged 2-10 in Australia.
 Use web search. Prefer reliable sources: NASA, CSIRO, Australian Museum, museums, National Geographic Kids, Britannica Kids, universities, government health sites.
 Return ONLY JSON: {"facts":[{"id":"F1","fact":"one plain, checkable sentence","source_url":"https://...","source_title":"..."}]}
 Give 6-10 facts: the core answer first, then 2-3 vivid kid-relatable facts, then facts usable as True/False game answers.
@@ -38,6 +38,13 @@ const BAND_RULES: Record<Band, string> = {
 - 3 explainer segments. 2 games chosen from True or False, quick quiz (two choices), Would You Rather, What Am I? riddle.
 - 2 new words, each taught with PEER.
 - Prompts: what/where/how questions, "why do you think?", riddles. At most ONE "have you ever...?" or "remember when...?" prompt.
+- Pauses after questions: 3 seconds.`,
+  explorers: `AGE BAND: EXPLORERS (ages 7-10)
+- 1100-1400 words total. Sentences under 16 words; real terms explained once.
+- 4 explainer segments, including one "how do scientists know?" moment.
+- 2-3 games: quick quiz (three choices), True or False, What Am I? riddle, or a "would you rather" with a reason.
+- 2-3 new words, each taught once with PEER and used again later.
+- Prompts: "why do you think?", predictions, simple comparisons and numbers. Up to two "have you ever...?" prompts.
 - Pauses after questions: 3 seconds.`,
 };
 
@@ -111,7 +118,12 @@ export function introLines(name: string, band: Band, askedByThem: boolean) {
   const otto = askedByThem
     ? `Hey hey, ${name}! Guess what? Today's question comes from... YOU!`
     : `Hey hey, ${name}! Today's question is one lots of curious kids have asked.`;
-  const cheko = band === "littles" ? `Hi ${name}! Ready? Let's go!` : `[excited] Ooh, ${name}, this is a good one!`;
+  const cheko =
+    band === "littles"
+      ? `Hi ${name}! Ready? Let's go!`
+      : band === "bigs"
+        ? `[excited] Ooh, ${name}, this is a good one!`
+        : `[excited] ${name}, buckle up. This one's seriously cool.`;
   return [
     { speaker: "otto" as const, text: otto },
     { speaker: "cheko" as const, text: cheko },

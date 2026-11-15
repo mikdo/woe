@@ -3,11 +3,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/browser";
 import { useFamily, useSession } from "@/lib/hooks";
-import { CATEGORIES } from "@/lib/types";
+import { CATEGORIES, bandForAge, type Band } from "@/lib/types";
+import { BandPicker } from "@/components/BandPicker";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
 import { Logo } from "@/components/Logo";
 
-const FIELDS = "id, title, question, category, art_path, cheko_form, status";
+const FIELDS = "id, title, question, category, art_path, cheko_form, status, band";
 
 export default function Library() {
   const { session } = useSession();
@@ -16,6 +17,16 @@ export default function Library() {
   const [cat, setCat] = useState<string | null>(null);
   const [kidId, setKidId] = useState<string | null>(null);
   const [episodes, setEpisodes] = useState<EpisodeLite[]>([]);
+  const [band, setBand] = useState<Band | null>(null);
+  const [bandTouched, setBandTouched] = useState(false);
+
+  // Default the level to the listener's age (youngest for "All of us") until a grown-up changes it.
+  useEffect(() => {
+    if (bandTouched || !kids.length || !kidId) return;
+    const ages = kidId === "all" ? kids.map((k) => k.age) : kids.filter((k) => k.id === kidId).map((k) => k.age);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (ages.length) setBand(bandForAge(Math.min(...ages)));
+  }, [kidId, kids, bandTouched]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -41,6 +52,7 @@ export default function Library() {
 
   const shown = episodes
     .filter((e) => !cat || e.category === cat)
+    .filter((e) => !band || e.band === band)
     .sort((a, b) => Number(Boolean(b.favourite)) - Number(Boolean(a.favourite)));
 
   return (
@@ -83,6 +95,15 @@ export default function Library() {
         <button className={`btn ${tab === "ours" ? "bg-ink text-white" : "bg-white"}`} onClick={() => setTab("ours")}>Ours</button>
         <button className={`btn ${tab === "everyone" ? "bg-ink text-white" : "bg-white"}`} onClick={() => setTab("everyone")}>🌏 Everyone&apos;s</button>
       </div>
+
+      <BandPicker
+        allowAny
+        value={band}
+        onChange={(b) => {
+          setBandTouched(true);
+          setBand(b);
+        }}
+      />
 
       <div className="-mx-6 flex gap-2 overflow-x-auto px-6 pb-1">
         <button className={`shrink-0 rounded-full px-4 py-2 font-semibold ${!cat ? "bg-sun text-white" : "bg-white"}`} onClick={() => setCat(null)}>All</button>

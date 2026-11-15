@@ -1,4 +1,10 @@
-export type Band = "littles" | "bigs";
+export type Band = "littles" | "bigs" | "explorers";
+
+export const BANDS: { id: Band; label: string; ages: string; colour: string }[] = [
+  { id: "littles", label: "Littles", ages: "2–3", colour: "#f472b6" },
+  { id: "bigs", label: "Bigs", ages: "4–6", colour: "#38bdf8" },
+  { id: "explorers", label: "Explorers", ages: "7–10", colour: "#22c55e" },
+];
 
 export type Category =
   | "animals"
@@ -70,5 +76,5 @@ export type ClaimCheck = {
 };
 
 export function bandForAge(age: number): Band {
-  return age <= 3 ? "littles" : "bigs";
+  return age <= 3 ? "littles" : age <= 6 ? "bigs" : "explorers";
 }
