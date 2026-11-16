@@ -7,6 +7,7 @@ import { useFamily, useSession } from "@/lib/hooks";
 import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
 import { ShareFamily } from "@/components/ShareFamily";
 import { CostCard } from "@/components/CostCard";
+import { SetPassword } from "@/components/SetPassword";
 
 type Ask = { id: string; text: string; status: string; triage_reason: string | null; created_at: string; kid_id: string | null; created_new: boolean; episode_id: string | null };
 
@@ -110,6 +111,8 @@ export default function GrownUps() {
       </section>
 
       <CostCard familyId={family.id} />
+
+      <SetPassword title="Your password" />
 
       <section className="card space-y-3">
         <h2 className="text-xl font-semibold">Recent questions</h2>

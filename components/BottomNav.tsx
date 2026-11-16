@@ -14,7 +14,7 @@ const TABS = [
 export function BottomNav() {
   const path = usePathname();
   const { session } = useSession();
-  const show = Boolean(session) && !path.startsWith("/setup") && !path.startsWith("/join");
+  const show = Boolean(session) && !path.startsWith("/setup") && !path.startsWith("/join") && !path.startsWith("/reset-password");
   useEffect(() => {
     document.documentElement.classList.toggle("has-bottom-nav", show);
     return () => document.documentElement.classList.remove("has-bottom-nav");
