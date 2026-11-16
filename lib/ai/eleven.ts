@@ -44,14 +44,49 @@ async function speakOnce(lines: { speaker: Speaker; text: string }[]): Promise<B
   return Buffer.from(await res.arrayBuffer());
 }
 
-export async function soundEffect(text: string, seconds: number): Promise<Buffer> {
-  const res = await fetch(`${BASE}/sound-generation`, {
-    method: "POST",
-    headers: { "xi-api-key": config.elevenKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ text, duration_seconds: seconds, prompt_influence: 0.6 }),
+async function withEleven<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      if (attempt >= 4 || !/\b(409|429|500|502|503|504)\b/.test(m)) throw e;
+      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1) + Math.random() * 2000));
+    }
+  }
+}
+
+export async function soundEffect(text: string, seconds: number, loop = false): Promise<Buffer> {
+  return withEleven(async () => {
+    const res = await fetch(`${BASE}/sound-generation`, {
+      method: "POST",
+      headers: { "xi-api-key": config.elevenKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ text, duration_seconds: seconds, prompt_influence: 0.6, loop }),
+    });
+    if (!res.ok) throw new Error(`ElevenLabs sound failed: ${res.status} ${await res.text()}`);
+    return Buffer.from(await res.arrayBuffer());
   });
-  if (!res.ok) throw new Error(`ElevenLabs sound failed: ${res.status} ${await res.text()}`);
-  return Buffer.from(await res.arrayBuffer());
+}
+
+/** Instrumental music (theme tune). Tries the newest music model, then the default. */
+export async function music(prompt: string, ms: number): Promise<Buffer> {
+  let last: unknown;
+  for (const model of ["music_v2_5", "music_v2", undefined]) {
+    try {
+      return await withEleven(async () => {
+        const res = await fetch(`${BASE}/music`, {
+          method: "POST",
+          headers: { "xi-api-key": config.elevenKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, music_length_ms: ms, force_instrumental: true, ...(model ? { model_id: model } : {}) }),
+        });
+        if (!res.ok) throw new Error(`ElevenLabs music failed: ${res.status} ${await res.text()}`);
+        return Buffer.from(await res.arrayBuffer());
+      });
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
 }
 
 /** Speech to text. The audio is never stored. */

@@ -6,8 +6,9 @@ import { api, supabase } from "@/lib/supabase/browser";
 import { useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { CATEGORIES, type Activity, type ClaimCheck } from "@/lib/types";
+import { Engine, type EngineState } from "@/lib/audio/engine";
 
-type Item = { url: string; pause_after_s: number; caption: string; kind: string };
+type Item = { url: string; pause_after_s: number; caption: string; kind: string; fx_url?: string };
 type PlayData = {
   episode: {
     id: string;
@@ -23,10 +24,10 @@ type PlayData = {
   };
   items: Item[];
   sfx: Record<string, string>;
+  ambience_url: string | null;
   sources: { id: string; fact: string; url: string; title?: string }[];
   checks: ClaimCheck[];
 };
-type Mode = "idle" | "sfx" | "main" | "pause" | "done";
 
 export default function PlayerPage() {
   return (
@@ -43,15 +44,12 @@ function Player() {
   const [data, setData] = useState<PlayData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
-  const [mode, setMode] = useState<Mode>("idle");
+  const [mode, setMode] = useState<EngineState>("idle");
   const [showWords, setShowWords] = useState(false);
   const [grownUp, setGrownUp] = useState(false);
   const [fav, setFav] = useState(false);
   const [activity, setActivity] = useState<number | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  const modeRef = useRef<Mode>("idle");
-  const idxRef = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const engine = useRef<Engine | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -66,64 +64,28 @@ function Player() {
       .then(({ data }) => setFav(Boolean(data?.favourite)));
   }, [session, id, kid]);
 
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-
-  function set(m: Mode, i = idxRef.current) {
-    modeRef.current = m;
-    idxRef.current = i;
-    setMode(m);
-    setIdx(i);
-  }
-
-  function playMain(i: number) {
-    if (!data || !audio.current) return;
-    set("main", i);
-    audio.current.src = data.items[i].url;
-    audio.current.play().catch(() => set("idle", i));
-  }
-
-  function startItem(i: number) {
-    if (!data || !audio.current) return;
-    const it = data.items[i];
-    if (!it) return set("done", 0);
-    const key = it.kind.startsWith("sfx:") ? it.kind.slice(4) : null;
-    if (key && data.sfx[key]) {
-      set("sfx", i);
-      audio.current.src = data.sfx[key];
-      audio.current.play().catch(() => playMain(i));
-    } else playMain(i);
-  }
-
-  function onEnded() {
-    const i = idxRef.current;
-    if (modeRef.current === "sfx") return playMain(i);
-    if (modeRef.current !== "main" || !data) return;
-    const pause = data.items[i]?.pause_after_s ?? 0;
-    if (pause > 0) {
-      set("pause", i);
-      timer.current = setTimeout(() => startItem(i + 1), pause * 1000);
-    } else startItem(i + 1);
-  }
+  useEffect(() => {
+    if (!data) return;
+    const e = new Engine(data.items, data.sfx, data.ambience_url, (state, i) => {
+      setMode(state);
+      setIdx(i);
+    });
+    engine.current = e;
+    return () => e.destroy();
+  }, [data]);
 
   function toggle() {
-    if (!audio.current) return;
-    if (mode === "idle" || mode === "done") return startItem(mode === "done" ? 0 : idx);
-    if (mode === "pause") {
-      if (timer.current) clearTimeout(timer.current);
-      return startItem(idx + 1);
-    }
-    if (audio.current.paused) audio.current.play();
-    else {
-      audio.current.pause();
-      set("idle", idx);
-    }
+    const e = engine.current;
+    if (!e) return;
+    if (mode === "idle") return void e.start(idx);
+    if (mode === "done") return void e.start(0);
+    if (mode === "thinking") return e.skipPause();
+    if (mode === "paused") return void e.resume();
+    void e.pause();
   }
 
   function jump(delta: number) {
-    if (!data) return;
-    if (timer.current) clearTimeout(timer.current);
-    const next = Math.max(0, Math.min(data.items.length - 1, idx + delta));
-    startItem(next);
+    engine.current?.jump(idx + delta);
   }
 
   async function toggleFav() {
@@ -144,7 +106,7 @@ function Player() {
   if (!data) return null;
   const cat = CATEGORIES.find((c) => c.id === data.episode.category);
   const current = data.items[idx];
-  const playing = mode === "main" || mode === "sfx" || mode === "pause";
+  const playing = mode === "playing" || mode === "thinking";
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-5 p-6" style={{ background: `linear-gradient(${cat?.colour ?? "#38bdf8"}33, transparent 50%)` }}>
@@ -171,7 +133,7 @@ function Player() {
       <div className="flex items-center justify-center gap-5">
         <button className="btn-soft h-16 w-16 rounded-full text-2xl" onClick={() => jump(-1)} aria-label="Back a bit">⏮</button>
         <button className="btn-primary h-24 w-24 rounded-full text-4xl" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
-          {playing && mode !== "pause" ? "⏸" : "▶"}
+          {mode === "playing" ? "⏸" : "▶"}
         </button>
         <button className="btn-soft h-16 w-16 rounded-full text-2xl" onClick={() => jump(1)} aria-label="Skip ahead">⏭</button>
       </div>
@@ -182,7 +144,7 @@ function Player() {
         ))}
       </div>
 
-      {mode === "pause" && <p className="text-center font-display text-2xl">🤔 What do you think?</p>}
+      {mode === "thinking" && <p className="text-center font-display text-2xl">🤔 What do you think?</p>}
       {mode === "done" && <p className="text-center font-display text-2xl">Stay curious! 🌏</p>}
 
       {data.episode.activities.length > 0 && (
@@ -210,8 +172,6 @@ function Player() {
         {showWords ? "Hide the words" : "Show the words"}
       </button>
       {showWords && current && <p className="card whitespace-pre-line text-lg">{current.caption}</p>}
-
-      <audio ref={audio} onEnded={onEnded} onError={() => (modeRef.current === "sfx" ? playMain(idxRef.current) : null)} preload="auto" />
 
       <button className="btn-soft self-center" onClick={() => setGrownUp((g) => !g)}>
         {grownUp ? "Close grown-up notes" : "For grown-ups"}

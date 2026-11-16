@@ -3,7 +3,7 @@ import { config } from "@/lib/config";
 import { db, type Family } from "@/lib/supabase/admin";
 import { claudeJson } from "@/lib/ai/claude";
 import { checkClaims, embed, makeArt } from "@/lib/ai/gemini";
-import { applyAliases, speak } from "@/lib/ai/eleven";
+import { applyAliases, music, soundEffect, speak } from "@/lib/ai/eleven";
 import { CLAIMS_SCHEMA, PRONOUNCE_SCHEMA, SAME_SCHEMA, SCRIPT_SCHEMA, TRIAGE_SCHEMA } from "@/lib/schemas";
 import {
   CLAIMS_SYSTEM,
@@ -208,11 +208,12 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     // 5. Voice + art, in parallel
     await setStage(episodeId, "recording");
     const segments = script.segments;
+    const rev = Date.now().toString(36);
     const voice = inBatches(segments, 2, async (seg, i) => {
       if (seg.audio_path || outOfTime()) return;
       const lines = seg.lines.map((l) => ({ speaker: l.speaker, text: applyAliases(l.text, rules) }));
       const bytes = await speak(lines);
-      const path = `episodes/${episodeId}/seg-${String(i).padStart(2, "0")}.mp3`;
+      const path = `episodes/${episodeId}/${rev}-seg-${String(i).padStart(2, "0")}.mp3`;
       await upload("shared", path, bytes, "audio/mpeg");
       seg.audio_path = path;
     });
@@ -236,7 +237,44 @@ export async function produceEpisode(episodeId: string): Promise<void> {
       return continueLater(episodeId);
     }
 
-    // 6. Done
+    // 6. Sound design: ambience bed + spot effects (never blocks the episode)
+    if (!script.sound_done) {
+      if (outOfTime()) {
+        await db().from("episodes").update({ script: { ...script, segments }, art_path: artPath }).eq("id", episodeId);
+        return continueLater(episodeId);
+      }
+      await setStage(episodeId, "sound", { script: { ...script, segments }, art_path: artPath });
+      await ensureKit().catch((e) => console.error("sound kit failed", e));
+      const jobs: Promise<void>[] = [];
+      if (script.ambience && !script.ambience_path) {
+        jobs.push(
+          soundEffect(`${script.ambience}. Soft, calm, seamless background loop, no music, no voices`, 22, true)
+            .then(async (b) => {
+              const path = `episodes/${episodeId}/${rev}-ambience.mp3`;
+              await upload("shared", path, b, "audio/mpeg");
+              script!.ambience_path = path;
+            })
+            .catch((e) => console.error("ambience failed", episodeId, e)),
+        );
+      }
+      const fxSegs = segments.map((sg, i) => ({ sg, i })).filter(({ sg }) => sg.fx && !sg.fx_path).slice(0, 6);
+      jobs.push(
+        inBatches(fxSegs, 2, async ({ sg, i }) => {
+          try {
+            const b = await soundEffect(`${sg.fx}, friendly, for a children's show`, 2.5);
+            const path = `episodes/${episodeId}/${rev}-fx-${String(i).padStart(2, "0")}.mp3`;
+            await upload("shared", path, b, "audio/mpeg");
+            sg.fx_path = path;
+          } catch (e) {
+            console.error("fx failed", episodeId, i, e);
+          }
+        }),
+      );
+      await Promise.all(jobs);
+      script.sound_done = true;
+    }
+
+    // 7. Done
     const { data: fam } = await db().from("families").select("is_admin").eq("id", ep.created_by_family).maybeSingle();
     await db()
       .from("episodes")
@@ -259,6 +297,35 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     await setStage(episodeId, "error", { error: message.slice(0, 500) });
     throw e;
   }
+}
+
+const KIT: Record<string, { prompt: string; seconds: number; music?: boolean }> = {
+  theme: {
+    prompt:
+      "Upbeat, playful theme tune for a children's science podcast called What On Earth. Bouncy ukulele, glockenspiel, hand claps, " +
+      "kazoo-like whistle hook, warm bass, sunny and curious. Big happy intro, ends on a clean final button",
+    seconds: 12,
+    music: true,
+  },
+  jingle: { prompt: "Short cheerful kids' show sting, ukulele and glockenspiel, bright and warm, ends on a happy note", seconds: 3 },
+  ding: { prompt: "Soft friendly correct-answer chime, single bright ding", seconds: 1 },
+  boing: { prompt: "Silly cartoon boing spring sound, gentle and funny", seconds: 1 },
+  drumroll: { prompt: "Short soft snare drumroll building suspense, for kids, ends with a small cymbal tap", seconds: 2 },
+  poof: { prompt: "Magical sparkle poof transformation sound with twinkles", seconds: 2 },
+};
+
+/** Makes any missing shared sounds (theme tune and stings). Safe to call often. */
+export async function ensureKit(force = false) {
+  const { data } = await db().storage.from("shared").list("kit");
+  const have = new Set((data ?? []).map((f) => f.name.replace(/\.mp3$/, "")));
+  const made: string[] = [];
+  for (const [name, k] of Object.entries(KIT)) {
+    if (!force && have.has(name)) continue;
+    const bytes = k.music ? await music(k.prompt, k.seconds * 1000) : await soundEffect(k.prompt, k.seconds);
+    await upload("shared", `kit/${name}.mp3`, bytes, "audio/mpeg");
+    made.push(name);
+  }
+  return made;
 }
 
 /** Starts a fresh function run to continue an episode (server-to-server, authorised by the service key). */
@@ -296,15 +363,15 @@ export async function ensurePersonalClips(kid: Kid, episodeId: string, askedByTh
     .eq("kid_id", kid.id)
     .eq("episode_id", episodeId)
     .maybeSingle();
-  if (existing?.intro_path && existing?.outro_path) return existing;
+  const introPath = `${kid.family_id}/${kid.id}/${episodeId}-intro-v2.mp3`;
+  const outroPath = `${kid.family_id}/${kid.id}/${episodeId}-outro-v2.mp3`;
+  if (existing?.intro_path === introPath && existing?.outro_path) return existing;
   const name = kid.name_say_as || kid.name;
   const band: Band = bandForAge(kid.age);
   const rules = await pronunciationRules(kid.family_id);
   const say = (lines: { speaker: "otto" | "cheko"; text: string }[]) =>
     speak(lines.map((l) => ({ ...l, text: applyAliases(l.text, rules) })));
   const [intro, outro] = await Promise.all([say(introLines(name, band, askedByThem)), say(outroLines(name))]);
-  const introPath = `${kid.family_id}/${kid.id}/${episodeId}-intro.mp3`;
-  const outroPath = `${kid.family_id}/${kid.id}/${episodeId}-outro.mp3`;
   await Promise.all([
     upload("personal", introPath, intro, "audio/mpeg"),
     upload("personal", outroPath, outro, "audio/mpeg"),
@@ -321,19 +388,20 @@ export function joinNames(names: string[]) {
 
 /** One intro/outro that names every kid in the family, for "All of us" listening. */
 export async function ensureGroupClips(familyId: string, episodeId: string, askedByThem: boolean) {
-  const introPath = `${familyId}/all/${episodeId}-intro.mp3`;
-  const outroPath = `${familyId}/all/${episodeId}-outro.mp3`;
-  const { data: existing } = await db().storage.from("personal").list(`${familyId}/all`, { search: episodeId });
-  if ((existing ?? []).length >= 2) return { intro_path: introPath, outro_path: outroPath };
+  const introPath = `${familyId}/all/${episodeId}-intro-v2.mp3`;
+  const outroPath = `${familyId}/all/${episodeId}-outro-v2.mp3`;
+  const { data: existing } = await db().storage.from("personal").list(`${familyId}/all`, { search: `${episodeId}-` });
+  const names = new Set((existing ?? []).map((f) => f.name));
+  if (names.has(`${episodeId}-intro-v2.mp3`) && names.has(`${episodeId}-outro-v2.mp3`)) return { intro_path: introPath, outro_path: outroPath };
 
   const { data: kids } = await db().from("kids").select("*").eq("family_id", familyId).order("created_at");
   const list = (kids ?? []) as Kid[];
-  const names = joinNames(list.map((k) => k.name_say_as || k.name));
+  const who = joinNames(list.map((k) => k.name_say_as || k.name));
   const band: Band = bandForAge(Math.min(...list.map((k) => k.age)));
   const rules = await pronunciationRules(familyId);
   const say = (lines: { speaker: "otto" | "cheko"; text: string }[]) =>
     speak(lines.map((l) => ({ ...l, text: applyAliases(l.text, rules) })));
-  const [intro, outro] = await Promise.all([say(introLines(names, band, askedByThem)), say(outroLines(names))]);
+  const [intro, outro] = await Promise.all([say(introLines(who, band, askedByThem)), say(outroLines(who))]);
   await Promise.all([
     upload("personal", introPath, intro, "audio/mpeg"),
     upload("personal", outroPath, outro, "audio/mpeg"),

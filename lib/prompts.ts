@@ -32,40 +32,44 @@ const BAND_RULES: Record<Band, string> = {
 - 2 explainer segments. 1 game: True or False with 3 statements, one obviously silly.
 - 1 new word, taught with PEER and repeated 3 times across the episode.
 - Prompts: fill-the-gap ("Volcanoes are big... mountains!"), animal sounds, body moves, yes/no.
-- Pauses after questions: 4 seconds.`,
+- Pauses after questions to the child: 2.5 seconds.`,
   bigs: `AGE BAND: BIGS (ages 4-6)
 - 750-950 words total. Sentences under 12 words.
 - 3 explainer segments. 2 games chosen from True or False, quick quiz (two choices), Would You Rather, What Am I? riddle.
 - 2 new words, each taught with PEER.
 - Prompts: what/where/how questions, "why do you think?", riddles. At most ONE "have you ever...?" or "remember when...?" prompt.
-- Pauses after questions: 3 seconds.`,
+- Pauses after questions to the child: 2 seconds.`,
   explorers: `AGE BAND: EXPLORERS (ages 7-10)
 - 1100-1400 words total. Sentences under 16 words; real terms explained once.
 - 4 explainer segments, including one "how do scientists know?" moment.
 - 2-3 games: quick quiz (three choices), True or False, What Am I? riddle, or a "would you rather" with a reason.
 - 2-3 new words, each taught once with PEER and used again later.
 - Prompts: "why do you think?", predictions, simple comparisons and numbers. Up to two "have you ever...?" prompts.
-- Pauses after questions: 3 seconds.`,
+- Pauses after questions to the child: 2 seconds.`,
 };
 
 export function scriptSystem(band: Band) {
   return `You write episodes of "What On Earth?" (WOE!, said "Whoa!"), a warm, slow-paced Australian science audio show.
 
 CAST
-- Otto: the human host. Warm, curious, unhurried dad energy. Explains, asks questions, talks to "you".
+- Otto: the human host. Warm, curious, unhurried dad energy. He does most of the talking: explains, asks the questions, talks to "you".
 - Cheko (said "Check-oh"): a stuffed otter sidekick who transforms to fit the topic (dino, robot, dragon, doctor, diver, or plain otter).
-  Excitable, silly, guesses wrong in games, gasps at big facts, cheers right answers. Says "Cheko... CHANGE-O!" when he transforms.
+  Cheko is bright, curious and enthusiastic, never dim. He asks the question a child is thinking ("But why don't they just walk?"),
+  makes sensible guesses (sometimes right, sometimes not), notices cool details, and now and then teaches Otto a fact.
+  He gets excited, not silly. He says "Cheko... CHANGE-O!" when he transforms.
+  Keep Cheko brief: at most one or two short lines in a segment, many segments are Otto alone, and Cheko has well under a quarter of the words.
 
 ${BAND_RULES[band]}
 
 STRUCTURE (one segment per beat, in this order)
-1 hello: Otto: "Hey hey! Welcome to What On Earth! I'm Otto." Cheko says hi.
+1 hello: Otto: "Hey hey! Welcome to What On Earth! I'm Otto." Cheko says a quick hi. (The app then adds who asked today's question, so don't mention the asker.)
 2 hook: Otto: "Whoaaa... what on earth is..." (pause for the kids to shout "WHOA!") then the question. Cheko transforms into his form here ("Cheko... CHANGE-O!", sfx "poof").
 3 framing: why it's puzzling, an "imagine..." moment.
 4 explainer (x2 or x3): mini question -> pause -> answer. Analogies to things toddlers touch.
 5 new_word (inside or after an explainer): PEER - say it, break into syllables, "Can you say it?", pause, praise, use it again.
 6 recap: the main ideas, one short line each.
 7 game segments: beat "game_tf", "game_quiz", "game_wyr" or "game_riddle". Put each answer in "answer". sfx "drumroll" before reveals, "ding" for true/correct, "boing" for false.
+   In games Cheko should sometimes guess right; when he's wrong it's a sensible guess.
 8 final_answer: the big answer in one sentence.
 9 teaser: "What do you think we'll wonder about next time?"
 10 signoff: "Keep asking questions, and stay curious!" Cheko changes back. sfx "jingle".
@@ -86,7 +90,7 @@ Guardrails:
 RULES
 - NEVER use any child's name. The app adds a personal hello separately.
 - Use ONLY the provided facts for any factual claim. List the fact ids each segment relies on in "facts".
-- Ask-pause-answer at least 5 times; set "pause_after_s" on segments that end with a question for the child.
+- Ask-pause-answer at least 5 times. Set "pause_after_s" ONLY on segments whose last line is a question for the child; every other segment gets 0.
 - At least one body-movement prompt ("Show me your big dinosaur stomp!").
 - Australian spelling and words (colour, metres, mum, zed). Kind to wrong guesses: "Ooh, good guess!"
 - You may use a few ElevenLabs audio tags inside text: [excited], [curious], [whispers], [laughs], [gasps]. Sparingly.
@@ -94,6 +98,10 @@ RULES
 - Category must be one of: ${CATEGORY_LIST}. ${FORM_RULES}.
 - art_prompt: a cover scene for the topic in one or two sentences, no people's faces needed, no text.
 - talk_about_it: 3 short prompts a parent can use afterwards at dinner or in the car.
+- ambience: one short line describing a gentle background soundscape for the topic's setting, to loop softly under the episode
+  (e.g. "Australian bush at dawn, distant birds, soft breeze"). Calm, never scary, no voices, no music.
+- sound effects: on 3-5 segments set "fx" to a short real-world sound that brings that moment to life
+  (e.g. "kangaroo thumping across dry dirt", "bubbles rising in water", "deep volcano rumble"). Friendly, not scary, 1-3 seconds. Others null.
 - grownup_fact: one extra "did you know?" for the grown-up, one or two sentences, from the provided facts.
 - activities: exactly 3 things to do afterwards that continue the learning, each a different kind:
   "make" (a craft or build from things most homes have: paper, cardboard, tape, pegs, playdough, pots, pillows),
@@ -109,7 +117,8 @@ RULES
 Return ONLY JSON:
 {"title":"Why Is the Sky Blue?","category":"earth","cheko_form":"dragon",
  "new_words":[{"word":"scatter","say_as":"SCAT-er"}],
- "segments":[{"beat":"hello","lines":[{"speaker":"otto","text":"..."},{"speaker":"cheko","text":"..."}],"facts":[],"pause_after_s":0,"sfx":"jingle","answer":null}],
+ "segments":[{"beat":"hello","lines":[{"speaker":"otto","text":"..."},{"speaker":"cheko","text":"..."}],"facts":[],"pause_after_s":0,"sfx":null,"fx":null,"answer":null}],
+ "ambience":"...",
  "art_prompt":"...","talk_about_it":["...","...","..."],"grownup_fact":"...",
  "activities":[{"kind":"make","title":"...","minutes":10,"need":["..."],"steps":["...","..."],"talk":"...","safety":null}]}`;
 }
@@ -140,15 +149,11 @@ Give an Australian-English respelling that a TTS will read correctly, using hyph
 Return ONLY JSON: {"words":[{"word":"...","alias":"..."}]} (empty list is fine).`;
 
 export function introLines(name: string, band: Band, askedByThem: boolean) {
+  // Plays straight after Otto's "Hey hey! Welcome to What On Earth!", so no second greeting.
   const otto = askedByThem
-    ? `Hey hey, ${name}! Guess what? Today's question comes from... YOU!`
-    : `Hey hey, ${name}! Today's question is one lots of curious kids have asked.`;
-  const cheko =
-    band === "littles"
-      ? `Hi ${name}! Ready? Let's go!`
-      : band === "bigs"
-        ? `[excited] Ooh, ${name}, this is a good one!`
-        : `[excited] ${name}, buckle up. This one's seriously cool.`;
+    ? `And guess what, ${name}? Today's question comes from... YOU!`
+    : `${name}, today's question is one lots of curious kids have asked.`;
+  const cheko = band === "littles" ? `Ooh, a good one!` : `[excited] Ooh, I've wondered about this too!`;
   return [
     { speaker: "otto" as const, text: otto },
     { speaker: "cheko" as const, text: cheko },

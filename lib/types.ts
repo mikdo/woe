@@ -52,6 +52,8 @@ export type Segment = {
   facts: string[];
   pause_after_s: number;
   sfx?: "jingle" | "ding" | "boing" | "drumroll" | "poof" | null;
+  fx?: string | null;
+  fx_path?: string;
   answer?: boolean | string | null;
   audio_path?: string;
 };
@@ -66,6 +68,9 @@ export type Script = {
   talk_about_it: string[];
   grownup_fact?: string;
   activities?: Activity[];
+  ambience?: string;
+  ambience_path?: string;
+  sound_done?: boolean;
 };
 
 export type Activity = {

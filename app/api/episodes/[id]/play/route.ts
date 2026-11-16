@@ -4,7 +4,16 @@ import type { Script, Fact, ClaimCheck } from "@/lib/types";
 
 export const maxDuration = 60;
 
-const KIT = ["jingle", "ding", "boing", "drumroll", "poof"] as const;
+const KIT = ["theme", "jingle", "ding", "boing", "drumroll", "poof"] as const;
+
+type Item = { url: string; pause_after_s: number; caption: string; kind: string; fx_url?: string };
+
+/** Only real questions to the child get a thinking pause, and never a long one. */
+function pauseFor(seg: Script["segments"][number]) {
+  const last = seg.lines[seg.lines.length - 1]?.text.trim() ?? "";
+  if (!seg.pause_after_s || !/\?["\u201d\)]*$/.test(last)) return 0;
+  return Math.min(seg.pause_after_s, 2.5);
+}
 
 function caption(text: string) {
   return text.replace(/\[[^\]]+\]\s*/g, "").trim();
@@ -30,7 +39,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (ep.status !== "ready") return Response.json({ error: "Not ready yet", status: ep.status }, { status: 409 });
 
   const script = ep.script as Script;
-  const items: { url: string; pause_after_s: number; caption: string; speaker?: string; kind: string }[] = [];
+  const items: Item[] = [];
   const sfx = Object.fromEntries(KIT.map((k) => [k, publicUrl(`kit/${k}.mp3`)]));
 
   let kid: { id: string; family_id: string; name: string; name_say_as: string | null; age: number } | null = null;
@@ -72,23 +81,28 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     await db().from("plays").insert({ family_id: auth.family.id, kid_id: kid.id, episode_id: id });
   }
 
+  // Theme tune → Otto's hello → personal "today's question comes from…" → the episode.
+  items.push({ url: sfx.theme, pause_after_s: 0, caption: "🎵 What On Earth!", kind: "theme" });
+  const segs = script.segments.filter((sg) => sg.audio_path);
+  const helloCount = segs[0]?.beat === "hello" ? 1 : 0;
+  const segItem = (seg: Script["segments"][number]): Item => ({
+    url: publicUrl(seg.audio_path!),
+    pause_after_s: pauseFor(seg),
+    caption: seg.lines.map((l) => `${l.speaker === "otto" ? "Otto" : "Cheko"}: ${caption(l.text)}`).join("\n"),
+    kind: seg.sfx && seg.sfx !== "jingle" ? `sfx:${seg.sfx}` : seg.beat,
+    fx_url: seg.fx_path ? publicUrl(seg.fx_path) : undefined,
+  });
+  segs.slice(0, helloCount).forEach((sg) => items.push(segItem(sg)));
   if (clips?.intro_path) {
     const url = await signedUrl(clips.intro_path);
-    if (url) items.push({ url, pause_after_s: 0.4, caption: `Hello, ${hello}!`, kind: "intro" });
+    if (url) items.push({ url, pause_after_s: 0, caption: `Today's question, ${hello}!`, kind: "intro" });
   }
-  for (const seg of script.segments) {
-    if (!seg.audio_path) continue;
-    items.push({
-      url: publicUrl(seg.audio_path),
-      pause_after_s: seg.pause_after_s ?? 0,
-      caption: seg.lines.map((l) => `${l.speaker === "otto" ? "Otto" : "Cheko"}: ${caption(l.text)}`).join("\n"),
-      kind: seg.sfx ? `sfx:${seg.sfx}` : seg.beat,
-    });
-  }
+  segs.slice(helloCount).forEach((sg) => items.push(segItem(sg)));
   if (clips?.outro_path) {
     const url = await signedUrl(clips.outro_path);
     if (url) items.push({ url, pause_after_s: 0, caption: `Bye, ${hello}!`, kind: "outro" });
   }
+  items.push({ url: sfx.jingle, pause_after_s: 0, caption: "🎵", kind: "sting" });
 
   const facts = (ep.facts?.facts ?? []) as Fact[];
   const checks = (ep.facts?.checks ?? []) as ClaimCheck[];
@@ -108,6 +122,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     },
     items,
     sfx,
+    ambience_url: script.ambience_path ? publicUrl(script.ambience_path) : null,
     sources: facts.map((f) => ({ id: f.id, fact: f.fact, url: f.source_url, title: f.source_title })),
     checks,
   });
