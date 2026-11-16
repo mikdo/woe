@@ -188,12 +188,16 @@ export async function produceEpisode(episodeId: string): Promise<void> {
 
     // 4. Pronunciation
     await setStage(episodeId, "pronouncing");
+    // Finding new tricky words is a nice-to-have: if it fails, the word list still applies.
     const { words } = await claudeJson<{ words: { word: string; alias: string }[] }>({
       model: config.claudeFast,
       system: PRONOUNCE_SYSTEM,
       user: script.segments.flatMap((s) => s.lines.map((l) => l.text)).join("\n"),
       maxTokens: 6000,
       schema: PRONOUNCE_SCHEMA,
+    }).catch((e) => {
+      console.error("pronunciation check skipped", episodeId, e);
+      return { words: [] as { word: string; alias: string }[] };
     });
     // The global dictionary grows with new words (unapproved); existing entries are never overwritten.
     const known = new Set((await pronunciationRules(null)).map((r) => r.word.toLowerCase()));
