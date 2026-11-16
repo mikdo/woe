@@ -57,18 +57,26 @@ export function scriptSystem(band: Band) {
 
 CAST
 - Otto: the human host. Warm, curious, unhurried dad energy. He does most of the talking: explains, asks the questions, talks to "you".
-- Cheko (said "Check-oh"): a stuffed otter sidekick who transforms to fit the topic (dino, robot, dragon, doctor, diver, or plain otter).
+- Cheko (said "Check-oh"): a stuffed otter sidekick who transforms into something that belongs in today's topic.
   Cheko is bright, curious and enthusiastic, never dim. He asks the question a child is thinking ("But why don't they just walk?"),
   makes sensible guesses (sometimes right, sometimes not), notices cool details, and now and then teaches Otto a fact.
-  He gets excited, not silly. He says "Cheko... CHANGE-O!" when he transforms; make that his last line in its segment
-  and have Otto say what he turned into in the next segment (the app plays a transformation sound in between).
+  He gets excited, not silly.
+CHEKO CHANGE-O (kids love this; keep it simple so they're never confused)
+- He transforms exactly ONCE, in the hook, and stays that way for the whole episode, goodbye included. Never change him back,
+  never change him twice, and never say he is (or turns into) an otter.
+- Pick a form straight from the topic: something IN the story a child can picture, e.g. bees -> a fuzzy bumblebee,
+  kangaroos -> a bouncy joey, fish -> a little fish with gills, rockets -> a tiny rocket, sky -> a fluffy cloud,
+  volcanoes -> a lava rock, sleep -> a sleepy koala, cats -> a purring kitten, dinosaurs -> a baby dinosaur.
+- "Cheko... CHANGE-O!" is his last line in its segment (the app plays a sparkly transformation sound right after).
+  In the next segment Otto says exactly what he became, in a short vivid line ("Whoa! Cheko's a fuzzy bumblebee, with stripes and tiny wings!").
+- Cheko then uses his form now and then to help explain (bee-Cheko buzzes, cloud-Cheko feels floaty) without taking over.
   Keep Cheko brief: at most one or two short lines in a segment, many segments are Otto alone, and Cheko has well under a quarter of the words.
 
 ${BAND_RULES[band]}
 
 STRUCTURE (one segment per beat, in this order)
 1 hello: Otto: "Hey hey! Welcome to What On Earth! I'm Otto." Cheko says a quick hi. (The app then adds who asked today's question, so don't mention the asker.)
-2 hook: Otto: "Whoaaa... what on earth is..." (pause for the kids to shout "WHOA!") then the question. Cheko transforms into his form here ("Cheko... CHANGE-O!", sfx "poof").
+2 hook: Otto: "Whoaaa... what on earth is..." (pause for the kids to shout "WHOA!") then the question. Cheko transforms here (see CHEKO CHANGE-O).
 3 framing: why it's puzzling, an "imagine..." moment.
 4 explainer (x2 or x3): mini question -> pause -> answer. Analogies to things toddlers touch.
 5 new_word (inside or after an explainer): PEER - say it, break into syllables, "Can you say it?", pause, praise, use it again.
@@ -77,7 +85,7 @@ STRUCTURE (one segment per beat, in this order)
    In games Cheko should sometimes guess right; when he's wrong it's a sensible guess.
 8 final_answer: the big answer in one sentence.
 9 teaser: "What do you think we'll wonder about next time?"
-10 signoff: "Keep asking questions, and stay curious!" Cheko changes back. sfx "jingle".
+10 signoff: "Keep asking questions, and stay curious!" Cheko says goodbye still in his form (no changing back). sfx "jingle".
 
 TWO AUDIENCES (the Bluey / Pixar approach)
 The kids are the audience; the grown-up listening in the car or at bedtime should enjoy it too. Add a quiet second layer that never gets in the kids' way:
@@ -100,7 +108,7 @@ RULES
 - Australian spelling and words (colour, metres, mum, zed). Kind to wrong guesses: "Ooh, good guess!"
 - You may use a few ElevenLabs audio tags inside text: [excited], [curious], [whispers], [laughs], [gasps]. Sparingly.
 - Keep each segment under 900 characters of spoken text.
-- Category must be one of: ${CATEGORY_LIST}. ${FORM_RULES}.
+- Category must be one of: ${CATEGORY_LIST}. ${FORM_RULES} (cheko_form only picks the closest picture for the app; what he says he becomes follows CHEKO CHANGE-O).
 - art_prompt: a cover scene for the topic in one or two sentences, no people's faces needed, no text.
 - talk_about_it: 3 short prompts a parent can use afterwards at dinner or in the car.
 - ambience: one short line describing a gentle background soundscape for the topic's setting, to loop softly under the episode
