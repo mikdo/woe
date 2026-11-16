@@ -27,7 +27,7 @@ export const config = {
     .filter(Boolean),
 
   matchThreshold: Number(process.env.MATCH_THRESHOLD ?? "0.82"),
-  maxFixLoops: 2,
+  maxFixLoops: 1,
 };
 
 export function missingKeys(): string[] {

@@ -2,7 +2,13 @@ import "server-only";
 import { GoogleGenAI } from "@google/genai";
 import { config } from "@/lib/config";
 import { extractJson } from "@/lib/ai/claude";
-import type { ClaimCheck } from "@/lib/types";
+import type { ClaimCheck, Fact } from "@/lib/types";
+import { addImage, addTokens } from "@/lib/ai/cost";
+
+type Usage = { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number } | undefined;
+function track(model: string, u: Usage) {
+  addTokens(model, { in: u?.promptTokenCount ?? 0, out: (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0) });
+}
 
 let client: GoogleGenAI | null = null;
 
@@ -61,18 +67,53 @@ Claims:
 ${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}`;
 
   const models = [config.geminiCheckModel, ...FALLBACK_CHECK_MODELS.filter((m) => m !== config.geminiCheckModel)];
-  const res = await withRetry(models, (model) =>
-    gemini().models.generateContent({
+  let used = models[0];
+  const res = await withRetry(models, (model) => {
+    used = model;
+    return gemini().models.generateContent({
       model,
       contents: prompt,
       config: { tools: [{ googleSearch: {} }], temperature: 0 },
-    }),
-  );
+    });
+  });
+  track(used, res.usageMetadata);
   const parsed = extractJson<{ checks: ClaimCheck[] }>(res.text ?? "");
   const sources = (res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [])
     .map((c) => c.web?.uri)
     .filter(Boolean) as string[];
   return parsed.checks.map((c, i) => ({ ...c, source_url: c.source_url || sources[i] || sources[0] }));
+}
+
+/**
+ * Research with Google Search grounding: 6-10 checkable facts, each with a source.
+ * Sources come from the pages Google actually returned.
+ */
+export async function researchFacts(system: string, question: string, band: string): Promise<Fact[]> {
+  const models = [config.geminiCheckModel, ...FALLBACK_CHECK_MODELS.filter((m) => m !== config.geminiCheckModel)];
+  let used = models[0];
+  const res = await withRetry(models, (model) => {
+    used = model;
+    return gemini().models.generateContent({
+      model,
+      contents: `${system}\n\nQuestion from a child: ${question}\nAge band: ${band}\n\nReturn ONLY the JSON.`,
+      config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+    });
+  });
+  track(used, res.usageMetadata);
+  const parsed = extractJson<{ facts: Fact[] }>(res.text ?? "");
+  const chunks = (res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [])
+    .map((c) => ({ uri: c.web?.uri ?? "", title: c.web?.title ?? "" }))
+    .filter((c) => c.uri);
+  // Prefer a real source per fact: use the grounding support that covers it, else the model's own URL, else the first source.
+  const supports = res.candidates?.[0]?.groundingMetadata?.groundingSupports ?? [];
+  const facts = (parsed.facts ?? []).filter((f) => f?.fact).slice(0, 10);
+  return facts.map((f, i) => {
+    const sup = supports.find((s) => s.segment?.text && f.fact.includes(s.segment.text.slice(0, 40)));
+    const chunk = sup?.groundingChunkIndices?.length ? chunks[sup.groundingChunkIndices[0]] : undefined;
+    const fallback = chunks[i % Math.max(1, chunks.length)];
+    const url = chunk?.uri ?? (f.source_url?.startsWith("http") ? f.source_url : fallback?.uri ?? "");
+    return { id: f.id || `F${i + 1}`, fact: f.fact, source_url: url, source_title: f.source_title || chunk?.title || fallback?.title };
+  });
 }
 
 /** Square picture-book cover art. Returns PNG bytes. */
@@ -95,5 +136,6 @@ export async function makeArt(prompt: string, styleRefs: { mimeType: string; dat
   }));
   const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new Error("No image returned");
+  addImage(config.geminiImageModel);
   return Buffer.from(part.inlineData.data, "base64");
 }

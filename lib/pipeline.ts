@@ -2,7 +2,8 @@ import "server-only";
 import { config } from "@/lib/config";
 import { db, type Family } from "@/lib/supabase/admin";
 import { claudeJson } from "@/lib/ai/claude";
-import { checkClaims, embed, makeArt } from "@/lib/ai/gemini";
+import { checkClaims, embed, makeArt, researchFacts } from "@/lib/ai/gemini";
+import { costStep, trackCosts } from "@/lib/ai/cost";
 import { applyAliases, music, soundEffect, speak } from "@/lib/ai/eleven";
 import { CLAIMS_SCHEMA, PRONOUNCE_SCHEMA, SAME_SCHEMA, SCRIPT_SCHEMA, TRIAGE_SCHEMA } from "@/lib/schemas";
 import {
@@ -102,6 +103,26 @@ async function inBatches<T>(items: T[], size: number, fn: (item: T, i: number) =
  * Each finished step is saved, so a timed-out run can be resumed.
  */
 export async function produceEpisode(episodeId: string): Promise<void> {
+  const { error, tally } = await trackCosts(() => produceEpisodeRun(episodeId));
+  if (tally.lines.length || tally.elevenChars) {
+    const { data: row } = await db().from("episodes").select("cost_usd, cost_detail").eq("id", episodeId).maybeSingle();
+    const detail = (row?.cost_detail as { lines?: unknown[]; eleven_chars?: number } | null) ?? {};
+    const usd = tally.lines.reduce((s, l) => s + l.usd, 0);
+    await db()
+      .from("episodes")
+      .update({
+        cost_usd: Number(row?.cost_usd ?? 0) + usd,
+        cost_detail: {
+          lines: [...(detail.lines ?? []), ...tally.lines.map((l) => ({ ...l, usd: Math.round(l.usd * 10000) / 10000 }))].slice(-80),
+          eleven_chars: (detail.eleven_chars ?? 0) + tally.elevenChars,
+        },
+      })
+      .eq("id", episodeId);
+  }
+  if (error) throw error;
+}
+
+async function produceEpisodeRun(episodeId: string): Promise<void> {
   const { data: ep } = await db().from("episodes").select("*").eq("id", episodeId).single();
   if (!ep || ep.status === "ready") return;
   const band = ep.band as Band;
@@ -114,13 +135,19 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     let facts = (ep.facts?.facts as Fact[] | undefined) ?? null;
     if (!facts) {
       await setStage(episodeId, "researching");
-      const r = await claudeJson<{ facts: Fact[] }>({
-        system: RESEARCH_SYSTEM,
-        user: `Question from a child: ${ep.question}\nAge band: ${band}`,
-        webSearch: true,
-        maxTokens: 16000,
+      costStep("research");
+      // Gemini researches with Google Search (much cheaper); Claude's web search is the fallback.
+      facts = await researchFacts(RESEARCH_SYSTEM, ep.question, band).catch(async (e) => {
+        console.error("Gemini research failed, using Claude", episodeId, e);
+        const r = await claudeJson<{ facts: Fact[] }>({
+          system: RESEARCH_SYSTEM,
+          user: `Question from a child: ${ep.question}\nAge band: ${band}`,
+          webSearch: true,
+          maxTokens: 16000,
+        });
+        return r.facts;
       });
-      facts = r.facts;
+      if (!facts?.length) throw new Error("Research found no facts");
       await db().from("episodes").update({ facts: { facts, checks: [] } }).eq("id", episodeId);
     }
 
@@ -132,6 +159,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     if (ep.fact_status !== "passed") {
       if (!script) {
         await setStage(episodeId, "writing");
+        costStep("script");
         script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
         await db().from("episodes").update({ script }).eq("id", episodeId);
         if (outOfTime()) return continueLater(episodeId);
@@ -142,6 +170,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
           return continueLater(episodeId);
         }
         await setStage(episodeId, loop === 0 ? "checking" : "fixing", { script });
+        costStep(loop === 0 ? "fact check" : "fix");
         const { claims } = await claudeJson<{ claims: string[] }>({
           model: config.claudeFast,
           system: CLAIMS_SYSTEM,
@@ -188,6 +217,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
 
     // 4. Pronunciation
     await setStage(episodeId, "pronouncing");
+    costStep("pronunciation");
     // Finding new tricky words is a nice-to-have: if it fails, the word list still applies.
     const { words } = await claudeJson<{ words: { word: string; alias: string }[] }>({
       model: config.claudeFast,
@@ -211,6 +241,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
 
     // 5. Voice + art, in parallel
     await setStage(episodeId, "recording");
+    costStep("art");
     if (!script.segments.some((sg) => sg.audio_path)) script.segments = splitTransforms(script.segments);
     const segments = script.segments;
     const rev = Date.now().toString(36);

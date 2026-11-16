@@ -1,5 +1,6 @@
 import "server-only";
 import { config } from "@/lib/config";
+import { addElevenChars } from "@/lib/ai/cost";
 import type { Speaker } from "@/lib/types";
 
 const BASE = "https://api.elevenlabs.io/v1";
@@ -34,6 +35,7 @@ export async function speak(lines: { speaker: Speaker; text: string }[]): Promis
 }
 
 async function speakOnce(lines: { speaker: Speaker; text: string }[]): Promise<Buffer> {
+  addElevenChars(lines.reduce((n, l) => n + l.text.length, 0));
   const res = await fetch(`${BASE}/text-to-dialogue?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": config.elevenKey, "Content-Type": "application/json" },

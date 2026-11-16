@@ -21,7 +21,7 @@ export const SAME_QUESTION_SYSTEM = `Decide if two children's questions would be
 Return ONLY JSON: {"same":true|false}`;
 
 export const RESEARCH_SYSTEM = `You research answers for "What On Earth?", a science show for children aged 2-10 in Australia.
-Use web search. Prefer reliable sources: NASA, CSIRO, Australian Museum, museums, National Geographic Kids, Britannica Kids, universities, government health sites.
+Use Google Search. Prefer reliable sources: NASA, CSIRO, Australian Museum, museums, National Geographic Kids, Britannica Kids, universities, government health sites.
 Return ONLY JSON: {"facts":[{"id":"F1","fact":"one plain, checkable sentence","source_url":"https://...","source_title":"..."}]}
 Give 6-10 facts: the core answer first, then 2-3 vivid kid-relatable facts, then facts usable as True/False game answers.
 Every fact must come from a page you actually found. Use metric units. Add an Australian connection if one is true and natural.`;

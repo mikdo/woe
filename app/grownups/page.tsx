@@ -6,6 +6,7 @@ import { api, supabase } from "@/lib/supabase/browser";
 import { useFamily, useSession } from "@/lib/hooks";
 import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
 import { ShareFamily } from "@/components/ShareFamily";
+import { CostCard } from "@/components/CostCard";
 
 type Ask = { id: string; text: string; status: string; triage_reason: string | null; created_at: string; kid_id: string | null; created_new: boolean; episode_id: string | null };
 
@@ -107,6 +108,8 @@ export default function GrownUps() {
           {usedThisMonth} of {family.monthly_new_limit} new episodes used. Questions already in the library are free.
         </p>
       </section>
+
+      <CostCard familyId={family.id} />
 
       <section className="card space-y-3">
         <h2 className="text-xl font-semibold">Recent questions</h2>
