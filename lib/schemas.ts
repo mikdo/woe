@@ -1,6 +1,7 @@
 // JSON schemas for Claude's structured outputs (strict: every key required, no extras).
 const str = { type: "string" };
 const strArr = { type: "array", items: str };
+const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: "null" }] });
 const obj = (properties: Record<string, unknown>) => ({
   type: "object",
   properties,
@@ -34,8 +35,8 @@ export const SCRIPT_SCHEMA = obj({
       lines: { type: "array", items: obj({ speaker: { type: "string", enum: ["otto", "cheko"] }, text: str }) },
       facts: strArr,
       pause_after_s: { type: "number" },
-      sfx: { type: ["string", "null"], enum: ["jingle", "ding", "boing", "drumroll", "poof", null] },
-      answer: { type: ["string", "null"] },
+      sfx: nullable({ type: "string", enum: ["jingle", "ding", "boing", "drumroll", "poof"] }),
+      answer: nullable(str),
     }),
   },
   art_prompt: str,
@@ -50,7 +51,7 @@ export const SCRIPT_SCHEMA = obj({
       need: strArr,
       steps: strArr,
       talk: str,
-      safety: { type: ["string", "null"] },
+      safety: nullable(str),
     }),
   },
 });
