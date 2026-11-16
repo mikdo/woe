@@ -6,6 +6,7 @@ import { useFamily, useSession } from "@/lib/hooks";
 import { SignIn } from "@/components/SignIn";
 import { Logo } from "@/components/Logo";
 import { Cheko, Otto } from "@/components/Characters";
+import { InTheWorks } from "@/components/InTheWorks";
 
 export default function Home() {
   const { session, loading } = useSession();
@@ -60,6 +61,8 @@ export default function Home() {
           </Link>
         )}
       </section>
+
+      <InTheWorks />
 
       <Link href="/library" className="btn-soft self-center text-xl">📚 Our WOE! library</Link>
     </main>

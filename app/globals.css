@@ -26,3 +26,8 @@ h1, h2, h3, .font-display { font-family: var(--font-display); }
 .recording { animation: pulse-ring 1.2s ease-out infinite; }
 @keyframes dot { 0%,80%,100% { opacity:.2; transform: scale(.8) } 40% { opacity:1; transform: scale(1) } }
 .dot { animation: dot 1.4s infinite ease-in-out both; }
+
+/* Room for the mini player bar. */
+html.has-mini-player main {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+}

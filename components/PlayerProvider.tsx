@@ -128,11 +128,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 function MiniPlayer() {
   const p = useContext(Ctx)!;
   const path = usePathname();
-  if (!p.track || path.startsWith("/e/")) return null;
+  const show = Boolean(p.track) && !path.startsWith("/e/");
+  // Leave room at the bottom of the page so the bar never covers buttons.
+  useEffect(() => {
+    document.documentElement.classList.toggle("has-mini-player", show);
+    return () => document.documentElement.classList.remove("has-mini-player");
+  }, [show]);
+  if (!p.track || !show) return null;
   const href = `/e/${p.track.id}${p.track.kid ? `?kid=${p.track.kid}` : ""}`;
   const pct = p.track.duration ? (p.time / p.track.duration) * 100 : 0;
   return (
-    <div className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-xl overflow-hidden rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,.15)]">
+    <div style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }} className="fixed inset-x-3 z-50 mx-auto max-w-xl overflow-hidden rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,.15)]">
       <div className="h-1 bg-sun" style={{ width: `${pct}%` }} />
       <div className="flex items-center gap-3 p-2 pr-3">
         <Link href={href} className="flex min-w-0 flex-1 items-center gap-3">

@@ -7,6 +7,7 @@ import { CATEGORIES, bandForAge, type Band } from "@/lib/types";
 import { BandPicker } from "@/components/BandPicker";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
 import { Logo } from "@/components/Logo";
+import { InTheWorks } from "@/components/InTheWorks";
 
 const FIELDS = "id, title, question, category, art_path, cheko_form, status, band";
 
@@ -62,6 +63,7 @@ export default function Library() {
         <Logo size={36} />
       </header>
       <h1 className="text-4xl font-bold">Library</h1>
+      <InTheWorks />
 
       {kids.length > 1 && (
         <div className="flex items-center gap-2">

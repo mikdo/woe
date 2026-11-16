@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
+import { STAGES } from "@/lib/stages";
+import { InTheWorks } from "@/components/InTheWorks";
 import { useFamily, useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
@@ -19,16 +21,7 @@ type Phase =
   | { kind: "thinking"; askId: string; episodeId: string | null; stage: string }
   | { kind: "message"; emoji: string; title: string; body: string };
 
-const STAGES: Record<string, string> = {
-  queued: "Otto is opening his big book…",
-  researching: "Otto is looking it up…",
-  writing: "Otto and Cheko are writing your episode…",
-  checking: "Double-checking every fact…",
-  fixing: "Fixing a fact to make it just right…",
-  pronouncing: "Practising the tricky words…",
-  recording: "Cheko is warming up his voice…",
-  resuming: "Picking up where we left off…",
-};
+
 
 export default function KidPage() {
   const { kidId } = useParams<{ kidId: string }>();
@@ -265,6 +258,8 @@ export default function KidPage() {
           </div>
         </div>
       )}
+
+      {phase.kind === "idle" && <InTheWorks kidId={kidId} onReady={loadShelf} />}
 
       {shelf.length > 0 && phase.kind === "idle" && (
         <section className="space-y-3">
