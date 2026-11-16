@@ -20,6 +20,18 @@ export function applyAliases(text: string, rules: { word: string; alias: string 
 
 /** Speaks a list of lines (one or two voices) as one MP3 clip. */
 export async function speak(lines: { speaker: Speaker; text: string }[]): Promise<Buffer> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await speakOnce(lines);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      if (attempt >= 2 || !/\b(429|500|502|503|504)\b/.test(m)) throw e;
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+    }
+  }
+}
+
+async function speakOnce(lines: { speaker: Speaker; text: string }[]): Promise<Buffer> {
   const res = await fetch(`${BASE}/text-to-dialogue?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": config.elevenKey, "Content-Type": "application/json" },

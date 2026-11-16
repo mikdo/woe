@@ -5,6 +5,30 @@ import { extractJson } from "@/lib/ai/claude";
 import type { ClaimCheck } from "@/lib/types";
 
 let client: GoogleGenAI | null = null;
+
+const FALLBACK_CHECK_MODELS = ["gemini-3.6-flash", "gemini-3-flash-preview"];
+
+function retryable(e: unknown) {
+  const m = e instanceof Error ? e.message : String(e);
+  return /\b(429|500|502|503|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|timeout/i.test(m);
+}
+
+/** Retries busy/overloaded errors with backoff, then tries fallback models. */
+async function withRetry<T>(models: string[], fn: (model: string) => Promise<T>): Promise<T> {
+  let last: unknown;
+  for (const model of models) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await fn(model);
+      } catch (e) {
+        last = e;
+        if (!retryable(e)) throw e;
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1) + Math.random() * 1000));
+      }
+    }
+  }
+  throw last;
+}
 function gemini() {
   if (!client) client = new GoogleGenAI({ apiKey: config.geminiKey });
   return client;
@@ -12,11 +36,13 @@ function gemini() {
 
 /** 768-dim normalised embedding for question matching. */
 export async function embed(text: string): Promise<number[]> {
-  const res = await gemini().models.embedContent({
-    model: config.geminiEmbedModel,
-    contents: text,
-    config: { outputDimensionality: 768, taskType: "SEMANTIC_SIMILARITY" },
-  });
+  const res = await withRetry([config.geminiEmbedModel], (model) =>
+    gemini().models.embedContent({
+      model,
+      contents: text,
+      config: { outputDimensionality: 768, taskType: "SEMANTIC_SIMILARITY" },
+    }),
+  );
   const values = res.embeddings?.[0]?.values ?? [];
   const norm = Math.sqrt(values.reduce((s, v) => s + v * v, 0)) || 1;
   return values.map((v) => v / norm);
@@ -34,11 +60,14 @@ Return ONLY JSON: {"checks":[{"claim":"...","verdict":"...","note":"one short se
 Claims:
 ${claims.map((c, i) => `${i + 1}. ${c}`).join("\n")}`;
 
-  const res = await gemini().models.generateContent({
-    model: config.geminiCheckModel,
-    contents: prompt,
-    config: { tools: [{ googleSearch: {} }], temperature: 0 },
-  });
+  const models = [config.geminiCheckModel, ...FALLBACK_CHECK_MODELS.filter((m) => m !== config.geminiCheckModel)];
+  const res = await withRetry(models, (model) =>
+    gemini().models.generateContent({
+      model,
+      contents: prompt,
+      config: { tools: [{ googleSearch: {} }], temperature: 0 },
+    }),
+  );
   const parsed = extractJson<{ checks: ClaimCheck[] }>(res.text ?? "");
   const sources = (res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [])
     .map((c) => c.web?.uri)
@@ -51,8 +80,8 @@ export async function makeArt(prompt: string, styleRefs: { mimeType: string; dat
   const style =
     "Friendly picture-book illustration for toddlers, soft hand-drawn texture, warm bright colours, simple shapes, " +
     "lots of space, no text, no letters, no real people, no logos or brand characters.";
-  const res = await gemini().models.generateContent({
-    model: config.geminiImageModel,
+  const res = await withRetry([config.geminiImageModel], (model) => gemini().models.generateContent({
+    model,
     contents: [
       {
         role: "user",
@@ -63,7 +92,7 @@ export async function makeArt(prompt: string, styleRefs: { mimeType: string; dat
       },
     ],
     config: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
-  });
+  }));
   const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) throw new Error("No image returned");
   return Buffer.from(part.inlineData.data, "base64");
