@@ -7,6 +7,7 @@ import { useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { CATEGORIES, type Activity, type ClaimCheck } from "@/lib/types";
 import { usePlayer, type Cue } from "@/components/PlayerProvider";
+import { ArrowLeft, MagnifyingGlass, Pause, Play, SkipBack, SkipForward, Star } from "@phosphor-icons/react";
 
 type PlayData = {
   episode: {
@@ -48,6 +49,8 @@ function Player() {
   const [fav, setFav] = useState(false);
   const [activity, setActivity] = useState<number | null>(null);
   const player = usePlayer();
+  const [peek, setPeek] = useState(false);
+  const [touchY, setTouchY] = useState<number | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -106,59 +109,95 @@ function Player() {
   if (!data) return null;
   const cat = CATEGORIES.find((c) => c.id === data.episode.category);
 
-  return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-5 p-6" style={{ background: `linear-gradient(${cat?.colour ?? "#38bdf8"}33, transparent 50%)` }}>
-      <header className="flex items-center justify-between">
-        <Link href={kid ? `/kid/${kid}` : "/library"} className="btn-soft px-4 py-2 text-base">← Back</Link>
-        <button onClick={toggleFav} className="text-3xl" aria-label="Favourite">{fav ? "⭐" : "☆"}</button>
-      </header>
+  const pct = duration ? Math.min(100, (time / duration) * 100) : 0;
+  const onTouchStart = (e: React.TouchEvent) => setTouchY(e.touches[0].clientY);
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchY === null) return;
+    const dy = e.changedTouches[0].clientY - touchY;
+    if (dy > 40) setPeek(true);
+    if (dy < -40) setPeek(false);
+    setTouchY(null);
+  };
 
-      <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-[2rem] shadow-[0_8px_0_rgba(0,0,0,.1)]" style={{ background: cat?.colour ?? "#38bdf8" }}>
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-xl flex-col bg-cream">
+      {/* Full-bleed cover art. Pull the sheet down to see all of it (find Cheko!). */}
+      <div
+        className="relative overflow-hidden transition-[height] duration-500 ease-out"
+        style={{ height: peek ? "84dvh" : "52dvh", background: cat?.colour ?? "#38bdf8" }}
+        onClick={() => peek && setPeek(false)}
+      >
         {data.episode.art_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={data.episode.art_url} alt="" className="h-full w-full object-cover" />
         ) : (
           <div className="grid h-full place-items-center text-8xl">{cat?.emoji ?? "🌏"}</div>
         )}
-        <div className="absolute bottom-3 left-3 flex items-end gap-2">
-          <Otto size={56} />
-          <div className={playing ? "bob" : ""}><Cheko form={data.episode.cheko_form} size={48} /></div>
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
+          <Link href={kid ? `/kid/${kid}` : "/library"} className="press grid h-11 w-11 place-items-center rounded-full bg-white/90 shadow" aria-label="Back">
+            <ArrowLeft size={20} weight="bold" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <Otto size={44} />
+            <div className={playing ? "bob" : ""}><Cheko form={data.episode.cheko_form} size={44} /></div>
+            <button onClick={(e) => { e.stopPropagation(); toggleFav(); }} className="press grid h-11 w-11 place-items-center rounded-full bg-white/90 shadow" aria-label={fav ? "Remove favourite" : "Favourite"}>
+              <Star size={22} weight={fav ? "fill" : "regular"} className={fav ? "celebrate text-amber-400" : ""} />
+            </button>
+          </div>
         </div>
+        {peek && (
+          <p className="pop-in absolute inset-x-0 bottom-12 mx-auto w-fit rounded-full bg-white/90 px-4 py-2 text-sm font-bold shadow">
+            <MagnifyingGlass className="mr-1 inline" weight="bold" /> Can you find Cheko?
+          </p>
+        )}
       </div>
 
-      <h1 className="text-center text-3xl font-bold">{data.episode.title}</h1>
-
-      <div className="flex items-center justify-center gap-5">
-        <button className="btn-soft h-16 w-16 rounded-full text-2xl" onClick={() => jump(-1)} aria-label="Back a bit">⏮</button>
-        <button className="btn-primary h-24 w-24 rounded-full text-4xl" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
-          {playing ? "⏸" : "▶"}
+      <section className="relative -mt-8 flex flex-1 flex-col gap-5 rounded-t-[2rem] border-t-[6px] border-ember bg-cream px-6 pb-6 pt-2" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <button className="mx-auto flex h-6 w-16 items-center justify-center" onClick={() => setPeek((v) => !v)} aria-label={peek ? "Show the player" : "See the whole picture"}>
+          <span className="h-1.5 w-10 rounded-full bg-ink/25" />
         </button>
-        <button className="btn-soft h-16 w-16 rounded-full text-2xl" onClick={() => jump(1)} aria-label="Skip ahead">⏭</button>
-      </div>
 
-      <div className="space-y-1">
-        <input
-          type="range"
-          min={0}
-          max={Math.max(1, Math.floor(duration))}
-          step={1}
-          value={Math.floor(time)}
-          onChange={(e) => player.seek(Number(e.target.value))}
-          className="w-full accent-[var(--color-sun)]"
-          aria-label="Where you are in the episode"
-        />
-        <div className="flex justify-between text-sm font-semibold text-slate-500">
-          <span>{clock(time)}</span>
-          <span>{clock(duration)}</span>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold leading-tight">{data.episode.title}</h1>
+          {cat && <p className="mt-1 text-sm font-semibold text-slate-500">{cat.emoji} {cat.label}</p>}
         </div>
-      </div>
+
+        <div className="space-y-1">
+          <input
+            type="range"
+            min={0}
+            max={Math.max(1, Math.floor(duration))}
+            step={1}
+            value={Math.floor(time)}
+            onChange={(e) => player.seek(Number(e.target.value))}
+            className="scrub w-full"
+            style={{ ["--pct" as string]: `${pct}%` }}
+            aria-label="Where you are in the episode"
+          />
+          <div className="flex justify-between text-xs font-bold tabular-nums text-slate-500">
+            <span>{clock(time)}</span>
+            <span>-{clock(Math.max(0, duration - time))}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-8">
+          <button className="press text-ink" onClick={() => jump(-1)} aria-label="Back a bit">
+            <SkipBack size={32} weight="fill" />
+          </button>
+          <button className="press grid h-[72px] w-[72px] place-items-center rounded-full bg-ember text-white shadow-[0_5px_0_#b5541f] active:shadow-[0_2px_0_#b5541f]" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
+            {playing ? <Pause size={34} weight="fill" /> : <Play size={34} weight="fill" className="translate-x-0.5" />}
+          </button>
+          <button className="press text-ink" onClick={() => jump(1)} aria-label="Skip ahead">
+            <SkipForward size={32} weight="fill" />
+          </button>
+        </div>
 
       {think && (
         <button className="text-center font-display text-2xl" onClick={() => player.seek(think.end)}>
           🤔 What do you think? <span className="text-base text-slate-500 underline">skip</span>
         </button>
       )}
-      {done && <p className="text-center font-display text-2xl">Keep wondering! 🌏</p>}
+      {done && <p className="celebrate text-center font-display text-xl font-bold">Keep wondering! 🌏</p>}
 
       <section className="card space-y-3">
         <h2 className="text-xl font-semibold">Wonder more 🎩</h2>
@@ -269,6 +308,7 @@ function Player() {
           </div>
         </section>
       )}
+      </section>
     </main>
   );
 }

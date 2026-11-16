@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/fredoka";
+import "@fontsource-variable/unbounded";
 import "@fontsource-variable/nunito";
 import "./globals.css";
 import { RegisterSW } from "@/components/RegisterSW";

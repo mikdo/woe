@@ -1,136 +1,165 @@
 "use client";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { X } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase/browser";
 import { useFamily, useSession } from "@/lib/hooks";
-import { CATEGORIES, bandForAge, type Band } from "@/lib/types";
-import { BandPicker } from "@/components/BandPicker";
+import { BANDS, CATEGORIES } from "@/lib/types";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
-import { Logo } from "@/components/Logo";
 import { InTheWorks } from "@/components/InTheWorks";
+import { PillSelect } from "@/components/SkyPage";
 
 const FIELDS = "id, title, question, category, art_path, cheko_form, status, band";
+type Heard = "any" | "new" | "heard";
 
 export default function Library() {
   const { session } = useSession();
   const { kids } = useFamily(Boolean(session));
   const [tab, setTab] = useState<"ours" | "everyone">("ours");
-  const [cat, setCat] = useState<string | null>(null);
-  const [kidId, setKidId] = useState<string | null>(null);
-  const [episodes, setEpisodes] = useState<EpisodeLite[]>([]);
-  const [band, setBand] = useState<Band | null>(null);
-  const [bandTouched, setBandTouched] = useState(false);
-
-  // Default the level to the listener's age (youngest for "All of us") until a grown-up changes it.
-  useEffect(() => {
-    if (bandTouched || !kids.length || !kidId) return;
-    const ages = kidId === "all" ? kids.map((k) => k.age) : kids.filter((k) => k.id === kidId).map((k) => k.age);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (ages.length) setBand(bandForAge(Math.min(...ages)));
-  }, [kidId, kids, bandTouched]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!kidId && kids.length) setKidId(localStorage.getItem("woe-kid") ?? kids[0].id);
-  }, [kids, kidId]);
+  const [episodes, setEpisodes] = useState<EpisodeLite[] | null>(null);
+  const [listens, setListens] = useState<Map<string, { heard: boolean; progress: number }>>(new Map());
+  // Everything starts wide open: all ages, all topics, heard or not.
+  const [band, setBand] = useState<string>("any");
+  const [cat, setCat] = useState<string>("any");
+  const [heard, setHeard] = useState<Heard>("any");
+  const [listener, setListener] = useState<string>("all");
 
   useEffect(() => {
     if (!session) return;
+    let stop = false;
     (async () => {
-      if (tab === "ours") {
-        const { data } = await supabase().from("family_library").select(`favourite, episodes(${FIELDS})`).order("added_at", { ascending: false });
-        setEpisodes(
-          ((data ?? []) as unknown as { favourite: boolean; episodes: EpisodeLite }[])
-            .map((r) => ({ ...r.episodes, favourite: r.favourite }))
-            .filter((e) => e?.status === "ready"),
-        );
-      } else {
-        const { data } = await supabase().from("episodes").select(FIELDS).eq("shared", true).eq("status", "ready").order("created_at", { ascending: false }).limit(200);
-        setEpisodes((data ?? []) as EpisodeLite[]);
+      setEpisodes(null);
+      const [eps, ls] = await Promise.all([
+        tab === "ours"
+          ? supabase().from("family_library").select(`favourite, episodes(${FIELDS})`).order("added_at", { ascending: false })
+          : supabase().from("episodes").select(FIELDS).eq("shared", true).eq("status", "ready").order("created_at", { ascending: false }).limit(200),
+        supabase().from("listens").select("episode_id, heard, position, duration"),
+      ]);
+      if (stop) return;
+      const list =
+        tab === "ours"
+          ? ((eps.data ?? []) as unknown as { favourite: boolean; episodes: EpisodeLite }[]).map((r) => ({ ...r.episodes, favourite: r.favourite }))
+          : ((eps.data ?? []) as EpisodeLite[]);
+      // One entry per episode, so the same episode listed for two kids shows once.
+      const seen = new Set<string>();
+      setEpisodes(list.filter((e) => e?.status === "ready" && !seen.has(e.id) && seen.add(e.id)));
+      const m = new Map<string, { heard: boolean; progress: number }>();
+      for (const l of (ls.data ?? []) as { episode_id: string; heard: boolean; position: number; duration: number }[]) {
+        const cur = m.get(l.episode_id) ?? { heard: false, progress: 0 };
+        m.set(l.episode_id, { heard: cur.heard || l.heard, progress: Math.max(cur.progress, l.duration ? l.position / l.duration : 0) });
       }
+      setListens(m);
     })();
+    return () => {
+      stop = true;
+    };
   }, [session, tab]);
 
-  const shown = episodes
-    .filter((e) => !cat || e.category === cat)
-    .filter((e) => !band || e.band === band)
-    .sort((a, b) => Number(Boolean(b.favourite)) - Number(Boolean(a.favourite)));
+  const shown = useMemo(
+    () =>
+      (episodes ?? [])
+        .map((e) => ({ ...e, ...(listens.get(e.id) ?? {}) }))
+        .filter((e) => band === "any" || e.band === band)
+        .filter((e) => cat === "any" || e.category === cat)
+        .filter((e) => heard === "any" || (heard === "heard" ? e.heard : !e.heard))
+        .sort((a, b) => Number(Boolean(b.favourite)) - Number(Boolean(a.favourite))),
+    [episodes, listens, band, cat, heard],
+  );
+  const filtered = band !== "any" || cat !== "any" || heard !== "any";
+  const clear = () => {
+    setBand("any");
+    setCat("any");
+    setHeard("any");
+  };
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-5 p-6">
-      <header className="flex items-center justify-between">
-        <Link href="/" className="btn-soft px-4 py-2 text-base">← Home</Link>
-        <Logo size={36} />
-      </header>
-      <h1 className="text-4xl font-bold">Library</h1>
-      <InTheWorks />
-
-      {kids.length > 1 && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-slate-500">Listening:</span>
-          <button
-            className={`rounded-full px-4 py-1.5 font-display text-lg ${kidId === "all" ? "bg-ink text-white" : "bg-white"}`}
-            onClick={() => {
-              setKidId("all");
-              localStorage.setItem("woe-kid", "all");
-            }}
-          >
-            All of us
-          </button>
-          {kids.map((k) => (
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-5 p-6" style={{ paddingTop: "calc(env(safe-area-inset-top) + 20px)" }}>
+      <div className="flex items-end justify-between gap-3">
+        <h1 className="text-3xl font-black">Library</h1>
+        <div className="flex rounded-full bg-white p-1 ring-1 ring-slate-200" role="tablist">
+          {(["ours", "everyone"] as const).map((t) => (
             <button
-              key={k.id}
-              className={`rounded-full px-4 py-1.5 font-display text-lg ${kidId === k.id ? "text-white" : "bg-white"}`}
-              style={kidId === k.id ? { background: k.colour } : undefined}
-              onClick={() => {
-                setKidId(k.id);
-                localStorage.setItem("woe-kid", k.id);
-              }}
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`press rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${tab === t ? "bg-ink text-white" : "text-slate-500"}`}
             >
-              {k.name}
+              {t === "ours" ? "Ours" : "Everyone's"}
             </button>
           ))}
         </div>
-      )}
-
-      <div className="flex gap-2">
-        <button className={`btn ${tab === "ours" ? "bg-ink text-white" : "bg-white"}`} onClick={() => setTab("ours")}>Ours</button>
-        <button className={`btn ${tab === "everyone" ? "bg-ink text-white" : "bg-white"}`} onClick={() => setTab("everyone")}>🌏 Everyone&apos;s</button>
       </div>
 
-      <BandPicker
-        allowAny
-        value={band}
-        onChange={(b) => {
-          setBandTouched(true);
-          setBand(b);
-        }}
-      />
+      <InTheWorks />
 
-      <div className="-mx-6 flex gap-2 overflow-x-auto px-6 pb-1">
-        <button className={`shrink-0 rounded-full px-4 py-2 font-semibold ${!cat ? "bg-sun text-white" : "bg-white"}`} onClick={() => setCat(null)}>All</button>
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            className="shrink-0 rounded-full px-4 py-2 font-semibold"
-            style={cat === c.id ? { background: c.colour, color: "white" } : { background: "white" }}
-            onClick={() => setCat(c.id)}
-          >
-            {c.emoji} {c.label}
+      <div className="-mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-1">
+        <PillSelect
+          label="Age"
+          value={band}
+          active={band !== "any"}
+          onChange={setBand}
+          options={[{ value: "any", label: "All ages" }, ...BANDS.map((b) => ({ value: b.id, label: `${b.label} ${b.ages}` }))]}
+        />
+        <PillSelect
+          label="Topic"
+          value={cat}
+          active={cat !== "any"}
+          onChange={setCat}
+          options={[{ value: "any", label: "All topics" }, ...CATEGORIES.map((c) => ({ value: c.id, label: `${c.emoji} ${c.label}` }))]}
+        />
+        <PillSelect
+          label="Heard"
+          value={heard}
+          active={heard !== "any"}
+          onChange={setHeard}
+          options={[
+            { value: "any", label: "Heard or not" },
+            { value: "new", label: "Not heard yet" },
+            { value: "heard", label: "Heard" },
+          ]}
+        />
+        {kids.length > 1 && (
+          <PillSelect
+            label="Playing for"
+            value={listener}
+            onChange={setListener}
+            options={[{ value: "all", label: "For all of us" }, ...kids.map((k) => ({ value: k.id, label: `For ${k.name}` }))]}
+          />
+        )}
+        {filtered && (
+          <button onClick={clear} className="press flex shrink-0 items-center gap-1 px-2 text-sm font-bold text-ember">
+            <X weight="bold" /> Clear
           </button>
-        ))}
+        )}
       </div>
 
-      {shown.length === 0 ? (
-        <p className="py-16 text-center text-lg text-slate-500">
-          {tab === "ours" ? "No episodes yet. Ask Otto a question!" : "Nothing here yet."}
-        </p>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {shown.map((e) => (
-            <EpisodeCard key={e.id} episode={e} href={`/e/${e.id}${kidId ? `?kid=${kidId}` : ""}`} />
+      {episodes === null ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3" aria-busy>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="skeleton aspect-[4/5] rounded-3xl" />
           ))}
         </div>
+      ) : shown.length === 0 ? (
+        <div className="pop-in flex flex-col items-center gap-3 py-16 text-center text-slate-500">
+          <span className="text-5xl">🔭</span>
+          <p className="text-lg">{filtered ? "Nothing matches those filters." : tab === "ours" ? "No adventures yet. Ask Otto a question!" : "Nothing here yet."}</p>
+          {filtered && (
+            <button className="btn-soft py-2 text-sm" onClick={clear}>
+              Clear filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <p className="-mb-2 text-sm font-semibold text-slate-500">
+            {shown.length} adventure{shown.length === 1 ? "" : "s"}
+          </p>
+          <div key={`${tab}${band}${cat}${heard}`} className="stagger grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {shown.map((e) => (
+              <EpisodeCard key={e.id} episode={e} href={`/e/${e.id}?kid=${listener}`} />
+            ))}
+          </div>
+        </>
       )}
     </main>
   );

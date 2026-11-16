@@ -6,7 +6,10 @@
   --color-sky: #38bdf8;
   --color-sun: #f97316;
   --color-leaf: #22c55e;
-  --font-display: 'Fredoka Variable', ui-rounded, system-ui, sans-serif;
+  --font-display: 'Unbounded Variable', 'Fredoka Variable', ui-rounded, system-ui, sans-serif;
+  --font-round: 'Fredoka Variable', ui-rounded, system-ui, sans-serif;
+  --color-sky-wash: #cfe9f7;
+  --color-ember: #e8793a;
   --font-sans: 'Nunito Variable', ui-rounded, system-ui, sans-serif;
 }
 
@@ -14,9 +17,9 @@ html, body { background: var(--color-cream); color: var(--color-ink); }
 body { font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 h1, h2, h3, .font-display { font-family: var(--font-display); }
 
-@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 font-display text-lg font-semibold transition active:scale-95 disabled:opacity-50; }
-@utility btn-primary { @apply btn bg-sun text-white shadow-[0_4px_0_#c2410c]; }
-@utility btn-soft { @apply btn bg-white text-ink shadow-[0_3px_0_#e2e8f0] ring-1 ring-slate-200; }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 font-display text-base font-semibold transition duration-200 active:scale-95 active:translate-y-0.5 disabled:opacity-50; }
+@utility btn-primary { @apply btn bg-ember text-white shadow-[0_4px_0_#b5541f] active:shadow-[0_2px_0_#b5541f]; }
+@utility btn-soft { @apply btn bg-white text-ink shadow-[0_3px_0_#e2e8f0] ring-1 ring-slate-200 active:shadow-[0_1px_0_#e2e8f0]; }
 @utility card { @apply rounded-3xl bg-white p-5 shadow-[0_4px_0_#f1e4cc] ring-1 ring-orange-100; }
 @utility input { @apply w-full rounded-2xl border-2 border-orange-100 bg-white px-4 py-3 text-lg outline-none focus:border-sky; }
 
@@ -36,9 +39,57 @@ html.has-bottom-nav {
   --nav-h: 4.25rem;
 }
 html.has-mini-player {
-  --mini-h: 5.25rem;
+  --mini-h: 4.5rem;
 }
 html.has-bottom-nav main,
 html.has-mini-player main {
   padding-bottom: calc(var(--nav-h) + var(--mini-h) + 1.5rem + env(safe-area-inset-bottom));
 }
+
+/* ---------- Motion ---------- */
+/* Everything springy, nothing slow. Turned off for people who ask for less motion. */
+:root { --spring: cubic-bezier(.34, 1.56, .64, 1); --ease-out: cubic-bezier(.22, 1, .36, 1); }
+
+@keyframes pop-in { 0% { opacity: 0; transform: translateY(10px) scale(.96) } 100% { opacity: 1; transform: none } }
+.pop-in { animation: pop-in .45s var(--spring) both; }
+.stagger > * { animation: pop-in .45s var(--spring) both; }
+.stagger > *:nth-child(2) { animation-delay: .05s } .stagger > *:nth-child(3) { animation-delay: .1s }
+.stagger > *:nth-child(4) { animation-delay: .15s } .stagger > *:nth-child(5) { animation-delay: .2s }
+.stagger > *:nth-child(6) { animation-delay: .25s } .stagger > *:nth-child(n+7) { animation-delay: .3s }
+
+@keyframes page-in { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+main { animation: page-in .35s var(--ease-out) both; }
+
+/* Squishy press for anything tappable */
+.press { transition: transform .18s var(--spring), box-shadow .18s; }
+.press:active { transform: scale(.94) translateY(2px); }
+
+@keyframes wiggle { 0%,100% { transform: rotate(0) } 25% { transform: rotate(-6deg) } 75% { transform: rotate(6deg) } }
+.wiggle { animation: wiggle .5s ease-in-out; }
+@keyframes float { 0%,100% { transform: translateY(0) rotate(-1deg) } 50% { transform: translateY(-10px) rotate(1.5deg) } }
+.drift { animation: float 4.5s ease-in-out infinite; }
+@keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+.skeleton { background: linear-gradient(90deg, #f6ead6 25%, #fff6e8 50%, #f6ead6 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes celebrate { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.12); opacity: 1 } 100% { transform: scale(1) } }
+.celebrate { animation: celebrate .6s var(--spring) both; }
+@keyframes bar-grow { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+.bar-grow { transform-origin: left; animation: bar-grow .6s var(--ease-out) both; }
+@keyframes eq { 0%,100% { transform: scaleY(.35) } 50% { transform: scaleY(1) } }
+.eq > span { display: inline-block; width: 3px; border-radius: 2px; background: currentColor; transform-origin: bottom; animation: eq .9s ease-in-out infinite; }
+.eq > span:nth-child(2) { animation-delay: .2s } .eq > span:nth-child(3) { animation-delay: .4s }
+
+/* Big round heading font for kid-facing titles */
+.font-round { font-family: var(--font-round); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* Slim player scrubber: thin track, played part in orange, round thumb */
+.scrub { -webkit-appearance: none; appearance: none; height: 18px; background: transparent; }
+.scrub::-webkit-slider-runnable-track { height: 5px; border-radius: 9px; background: linear-gradient(to right, var(--color-ember) var(--pct), #f6dfc4 var(--pct)); }
+.scrub::-moz-range-track { height: 5px; border-radius: 9px; background: #f6dfc4; }
+.scrub::-moz-range-progress { height: 5px; border-radius: 9px; background: var(--color-ember); }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5.5px; border-radius: 50%; background: var(--color-ember); border: 3px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.2); transition: transform .15s var(--spring); }
+.scrub:active::-webkit-slider-thumb { transform: scale(1.35); }
+.scrub::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--color-ember); border: 3px solid white; }

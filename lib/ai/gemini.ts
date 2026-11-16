@@ -120,7 +120,10 @@ export async function researchFacts(system: string, question: string, band: stri
 export async function makeArt(prompt: string, styleRefs: { mimeType: string; data: string }[] = []): Promise<Buffer> {
   const style =
     "Friendly picture-book illustration for toddlers, soft hand-drawn texture, warm bright colours, simple shapes, " +
-    "lots of space, no text, no letters, no real people, no logos or brand characters.";
+    "lots of space, no text, no letters, no real people, no logos or brand characters. " +
+    "Find-Cheko game: hide Cheko somewhere in the scene, small but findable by a 4 year old (peeking from behind something, " +
+    "tucked in a corner, up high): a cute little brown stuffed-toy otter with a round face, wearing the costume or form from the scene " +
+    "(e.g. bee stripes and wings, a space helmet). Don't put him in the centre.";
   const res = await withRetry([config.geminiImageModel], (model) => gemini().models.generateContent({
     model,
     contents: [

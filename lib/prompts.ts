@@ -132,7 +132,8 @@ RULES
 - You may use a few ElevenLabs audio tags inside text: [excited], [curious], [whispers], [laughs], [gasps]. Sparingly.
 - Keep each segment under 900 characters of spoken text.
 - Category must be one of: ${CATEGORY_LIST}. ${FORM_RULES} (cheko_form only picks the closest picture for the app; what he says he becomes follows CHEKO CHANGE-O).
-- art_prompt: a cover scene for the topic in one or two sentences, no people's faces needed, no text.
+- art_prompt: the cover scene in one or two sentences: the Wonder Hat destination at its most wonderful, no text.
+  Say what Cheko is dressed as (his transformation) so the artist can hide him in the scene for kids to find.
 - talk_about_it: 3 short prompts a parent can use afterwards at dinner or in the car.
 - follow_ups: 3 short questions in a child's words that this episode naturally leads to, each a different direction
   (e.g. after honey: "Why do bees dance?", "Do all bees make honey?", "What's inside a beehive?"). Not answered in this episode.

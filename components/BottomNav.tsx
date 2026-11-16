@@ -3,11 +3,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useSession } from "@/lib/hooks";
+import { Books, Sparkle, UsersThree, type Icon } from "@phosphor-icons/react";
 
-const TABS = [
-  { href: "/", label: "Ask", icon: "🙋", match: (p: string) => p === "/" || p.startsWith("/kid/") },
-  { href: "/library", label: "Library", icon: "📚", match: (p: string) => p.startsWith("/library") || p.startsWith("/e/") },
-  { href: "/grownups", label: "Grown-ups", icon: "🧑‍🍳", match: (p: string) => p.startsWith("/grownups") },
+const TABS: { href: string; label: string; icon: Icon; match: (p: string) => boolean }[] = [
+  { href: "/", label: "Adventure", icon: Sparkle, match: (p) => p === "/" || p.startsWith("/kid/") },
+  { href: "/library", label: "Library", icon: Books, match: (p) => p.startsWith("/library") || p.startsWith("/e/") },
+  { href: "/grownups", label: "Grown-ups", icon: UsersThree, match: (p) => p.startsWith("/grownups") },
 ];
 
 /** Thumb-reach tabs for phones. */
@@ -33,10 +34,10 @@ export function BottomNav() {
             <li key={t.href}>
               <Link
                 href={t.href}
-                className={`flex flex-col items-center gap-0.5 py-2 font-display text-sm font-semibold transition active:scale-95 ${active ? "text-sun" : "text-slate-500"}`}
+                className={`press flex flex-col items-center gap-1 py-2.5 text-[11px] font-bold tracking-wide ${active ? "text-ember" : "text-slate-500"}`}
                 aria-current={active ? "page" : undefined}
               >
-                <span className={`text-2xl ${active ? "" : "opacity-70"}`}>{t.icon}</span>
+                <t.icon size={26} weight={active ? "fill" : "regular"} className={active ? "celebrate" : ""} />
                 {t.label}
               </Link>
             </li>

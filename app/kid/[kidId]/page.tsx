@@ -9,7 +9,9 @@ import { useFamily, useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
-import { BandPicker } from "@/components/BandPicker";
+import { PillSelect } from "@/components/SkyPage";
+import { BANDS } from "@/lib/types";
+import { ArrowLeft, Keyboard, Microphone, Stop } from "@phosphor-icons/react";
 import { bandForAge, type Band } from "@/lib/types";
 
 type Phase =
@@ -208,43 +210,73 @@ export default function KidPage() {
   const band: Band = bandChoice ?? bandForAge(kid.age);
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-6 p-6" style={{ background: `linear-gradient(${kid.colour}22, transparent 40%)` }}>
-      <header className="flex items-center justify-between">
-        <Link href="/" className="btn-soft px-4 py-2 text-base">← Home</Link>
-        <span className="font-display text-2xl font-bold">{isAll ? kids.map((k) => k.name).join(" + ") : kid.name}</span>
-      </header>
+    <main className="mx-auto flex min-h-dvh max-w-xl flex-col bg-cream">
+      <div className="relative bg-sky-wash px-6 pb-12" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
+        <div className="flex items-center justify-between">
+          <Link href="/" className="press grid h-11 w-11 place-items-center rounded-full bg-white shadow-[0_3px_0_#e2e8f0]" aria-label="Home">
+            <ArrowLeft size={20} weight="bold" />
+          </Link>
+          <div className="flex items-end gap-1.5">
+            <Otto size={48} />
+            <div className="bob"><Cheko size={40} /></div>
+          </div>
+        </div>
+        <h1 className="pop-in mt-4 text-center text-3xl font-black leading-tight">
+          {isAll ? "Ok, everyone's coming!" : `Ok, ${kid.name}'s ready!`}
+        </h1>
+        {kids.length > 1 && (
+          <div className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Who's listening">
+            {[{ id: "all", name: "All of us" }, ...kids].map((k) => (
+              <Link
+                key={k.id}
+                href={`/kid/${k.id}`}
+                aria-current={k.id === kidId ? "page" : undefined}
+                className={`press rounded-full px-4 py-1.5 text-sm font-bold ${k.id === kidId ? "bg-ink text-white" : "bg-white/70 text-ink"}`}
+              >
+                {k.name}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <section className="flex flex-1 flex-col items-center justify-center gap-6 py-6 text-center">
+      <section className="relative -mt-8 flex flex-1 flex-col items-center gap-6 rounded-t-[2rem] border-t-[6px] border-ember bg-cream px-6 py-6 text-center">
         {follow && (phase.kind === "idle" || phase.kind === "confirm") && (
           <div className="flex items-center gap-2 rounded-full bg-sky/15 px-4 py-2 text-sm font-semibold">
             <span>🔗 Asking more about: {follow.title}</span>
             <button aria-label="Not a follow-up" className="text-slate-500" onClick={() => setFollow(null)}>✕</button>
           </div>
         )}
-        <div className="flex items-end gap-3">
-          <Otto size={88} />
-          <div className="bob"><Cheko size={72} /></div>
-        </div>
-
         {phase.kind === "idle" && (
           <>
-            <h1 className="text-4xl font-bold">What do you wonder?</h1>
-            <button onClick={startRecording} className="grid h-44 w-44 place-items-center rounded-full bg-sun text-7xl text-white shadow-[0_8px_0_#c2410c] active:scale-95" aria-label="Ask a question">
-              🎤
+            <div className="flex w-full items-center justify-between gap-3">
+              <h2 className="text-left text-2xl font-bold">What&apos;s the question?</h2>
+              <PillSelect
+                label="Listening level"
+                value={band}
+                options={BANDS.map((b) => ({ value: b.id, label: `${b.label} ${b.ages}` }))}
+                onChange={(b) => setBandChoice(b)}
+              />
+            </div>
+            <button
+              onClick={startRecording}
+              className="press grid h-44 w-44 place-items-center rounded-full bg-ember text-white shadow-[0_8px_0_#b5541f] active:shadow-[0_3px_0_#b5541f]"
+              aria-label="Ask a question"
+            >
+              <Microphone size={84} weight="fill" />
             </button>
-            <p className="text-slate-500">Tap and ask your question</p>
-            <BandPicker value={band} onChange={(b) => b && setBandChoice(b)} />
-            <button className="btn-soft" onClick={() => (isGrownUpUnlocked() ? setTyped("") : setGate(true))}>
-              ⌨️ Grown-up types it
+            <p className="text-slate-500">Tap and ask Otto anything</p>
+            <button className="btn-soft py-2 text-sm" onClick={() => (isGrownUpUnlocked() ? setTyped("") : setGate(true))}>
+              <Keyboard size={18} weight="bold" /> Grown-up types it
             </button>
           </>
         )}
 
         {phase.kind === "recording" && (
           <>
-            <h1 className="text-4xl font-bold">I&apos;m listening…</h1>
-            <button onClick={stopRecording} className="recording grid h-44 w-44 place-items-center rounded-full bg-red-500 text-6xl text-white" aria-label="Done">
-              ✋
+            <h2 className="pop-in text-2xl font-bold">I&apos;m listening…</h2>
+            <button onClick={stopRecording} className="recording press grid h-44 w-44 place-items-center rounded-full bg-ember text-white" aria-label="Done">
+              <Stop size={72} weight="fill" />
             </button>
             <p className="text-slate-500">Tap when you&apos;re done</p>
           </>

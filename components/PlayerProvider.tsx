@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Pause, Play } from "@phosphor-icons/react";
+import { supabase } from "@/lib/supabase/browser";
 
 export type Cue = { start: number; end: number; caption: string; kind: string; think?: boolean };
 export type Track = { id: string; kid: string | null; title: string; art: string | null; url: string; duration: number; cues: Cue[] };
@@ -18,6 +20,23 @@ type Player = {
 
 const Ctx = createContext<Player | null>(null);
 export const usePlayer = () => useContext(Ctx)!;
+
+/** Remembers where each listener got to, and marks an episode heard at 80% (or the end). */
+const lastSync = new Map<string, number>();
+function syncListen(t: Track, position: number, ended = false, force = false) {
+  const key = `${t.id}:${t.kid ?? "library"}`;
+  const now = Date.now();
+  if (!ended && !force && now - (lastSync.get(key) ?? 0) < 10000) return;
+  lastSync.set(key, now);
+  const heard = ended || (t.duration > 0 && position / t.duration >= 0.8);
+  supabase()
+    .from("listens")
+    .upsert(
+      { episode_id: t.id, listener: t.kid ?? "library", position: ended ? 0 : Math.floor(position), duration: Math.floor(t.duration), updated_at: new Date().toISOString(), ...(heard ? { heard: true } : {}) },
+      { onConflict: "family_id,episode_id,listener" },
+    )
+    .then(({ error }) => error && console.warn("listen sync", error.message));
+}
 
 const posKey = (t: Pick<Track, "id" | "kid">) => `woe:pos:${t.id}:${t.kid ?? "-"}`;
 export function savedPosition(id: string, kid: string | null) {
@@ -94,6 +113,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const a = audio.current;
     if (!a || !track) return;
     setTime(a.currentTime);
+    if (!a.paused) syncListen(track, a.currentTime);
     if (Math.abs(a.currentTime - lastSave.current) > 3) {
       lastSave.current = a.currentTime;
       try {
@@ -103,6 +123,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }
   function onEnded() {
     setPlaying(false);
+    if (track) syncListen(track, track.duration, true);
     if (track)
       try {
         localStorage.removeItem(posKey(track));
@@ -118,7 +139,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         preload="auto"
         onTimeUpdate={onTime}
         onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        onPause={() => {
+          setPlaying(false);
+          const a = audio.current;
+          if (track && a && !a.ended) syncListen(track, a.currentTime, false, true);
+        }}
         onEnded={onEnded}
       />
     </Ctx.Provider>
@@ -138,21 +163,40 @@ function MiniPlayer() {
   const href = `/e/${p.track.id}${p.track.kid ? `?kid=${p.track.kid}` : ""}`;
   const pct = p.track.duration ? (p.time / p.track.duration) * 100 : 0;
   return (
-    <div style={{ bottom: "calc(var(--nav-h) + 0.5rem + env(safe-area-inset-bottom))" }} className="fixed inset-x-3 z-50 mx-auto max-w-xl overflow-hidden rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,.15)]">
-      <div className="h-1 bg-sun" style={{ width: `${pct}%` }} />
+    <div
+      style={{ bottom: "calc(var(--nav-h) + 0.5rem + env(safe-area-inset-bottom))" }}
+      className="pop-in fixed inset-x-3 z-50 mx-auto max-w-xl overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_28px_rgba(0,0,0,.14)] ring-1 ring-black/5 backdrop-blur"
+    >
       <div className="flex items-center gap-3 p-2 pr-3">
         <Link href={href} className="flex min-w-0 flex-1 items-center gap-3">
           {p.track.art ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={p.track.art} alt="" className="h-12 w-12 rounded-2xl object-cover" />
+            <img src={p.track.art} alt="" className="h-11 w-11 rounded-xl object-cover" />
           ) : (
-            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-sky/20 text-2xl">🌏</span>
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-sky-wash text-xl">🌏</span>
           )}
-          <span className="truncate font-display text-lg font-semibold">{p.track.title}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-bold">{p.track.title}</span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+              {p.playing && (
+                <span className="eq flex h-3 items-end gap-[2px] text-ember" aria-hidden>
+                  <span className="h-3" /><span className="h-3" /><span className="h-3" />
+                </span>
+              )}
+              Otto &amp; Cheko
+            </span>
+          </span>
         </Link>
-        <button className="btn-primary h-12 w-12 rounded-full p-0 text-xl" onClick={p.playing ? p.pause : p.play} aria-label={p.playing ? "Pause" : "Play"}>
-          {p.playing ? "⏸" : "▶"}
+        <button
+          className="press grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ember text-white"
+          onClick={p.playing ? p.pause : p.play}
+          aria-label={p.playing ? "Pause" : "Play"}
+        >
+          {p.playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" className="translate-x-px" />}
         </button>
+      </div>
+      <div className="absolute inset-x-3 bottom-0 h-[3px] overflow-hidden rounded-full bg-orange-100">
+        <div className="h-full rounded-full bg-ember transition-[width] duration-500" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
