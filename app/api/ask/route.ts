@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const missing = missingKeys();
   if (missing.length) return Response.json({ error: `Server is missing: ${missing.join(", ")}` }, { status: 503 });
 
-  const body = (await req.json()) as { kidId?: string; text?: string; source?: "voice" | "typed"; band?: Band };
+  const body = (await req.json()) as { kidId?: string; text?: string; source?: "voice" | "typed"; band?: Band; parentEpisodeId?: string };
   const text = (body.text ?? "").trim().slice(0, 300);
   if (!text) return Response.json({ error: "No question" }, { status: 400 });
 
@@ -25,6 +25,13 @@ export async function POST(req: Request) {
   // Listening together uses the youngest kid's band.
   const youngest = Math.min(...(forAll ? allKids : [kid!]).map((k) => k.age));
   const band: Band = body.band && ["littles", "bigs", "explorers"].includes(body.band) ? body.band : bandForAge(youngest);
+
+  // A follow-up links to an episode this family can see.
+  let parentId: string | null = null;
+  if (body.parentEpisodeId) {
+    const { data: parent } = await db().from("episodes").select("id, shared, created_by_family").eq("id", body.parentEpisodeId).maybeSingle();
+    if (parent && (parent.shared || parent.created_by_family === auth.family.id)) parentId = parent.id;
+  }
 
   const t = await triage(text, band);
   const status =
@@ -41,6 +48,7 @@ export async function POST(req: Request) {
       band,
       status,
       triage_reason: t.verdict === "unclear" ? `unclear: ${t.reason}` : t.reason,
+      parent_episode_id: parentId,
     })
     .select("id")
     .single();
@@ -56,6 +64,7 @@ export async function POST(req: Request) {
     band,
     category: t.category,
     chekoForm: t.cheko_form,
+    parentEpisodeId: parentId,
   });
   return Response.json({ ...result, question: t.question });
 }

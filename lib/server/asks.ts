@@ -14,6 +14,7 @@ export async function proceedAsk(opts: {
   band: Band;
   category?: string;
   chekoForm?: string;
+  parentEpisodeId?: string | null;
 }): Promise<AskResult> {
   const { askId, family, question, band } = opts;
   const match = await findMatch(question, band, family.id);
@@ -48,6 +49,7 @@ export async function proceedAsk(opts: {
       status: "generating",
       stage: "queued",
       created_by_family: family.id,
+      parent_episode_id: opts.parentEpisodeId ?? null,
     })
     .select("id")
     .single();

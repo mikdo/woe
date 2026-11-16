@@ -46,6 +46,27 @@ export default function KidPage() {
   const [typed, setTyped] = useState<string | null>(null);
   const [shelf, setShelf] = useState<EpisodeLite[]>([]);
   const [bandChoice, setBandChoice] = useState<Band | null>(null);
+  // "Ask more about this": a follow-up to an episode (from the player).
+  const [follow, setFollow] = useState<{ id: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("follow");
+    const q = params.get("q");
+    if (!id) return;
+    supabase()
+      .from("episodes")
+      .select("id, title, question")
+      .eq("id", id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        setFollow({ id: data.id, title: data.title ?? data.question });
+        if (q) setPhase({ kind: "confirm", text: q, source: "typed" });
+      });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [session]);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,8 +127,9 @@ export default function KidPage() {
     try {
       const r = await api<{ askId: string; status: string; episodeId?: string; reason?: string }>("/api/ask", {
         method: "POST",
-        body: JSON.stringify({ kidId, text, source, band }),
+        body: JSON.stringify({ kidId, text, source, band, parentEpisodeId: follow?.id }),
       });
+      setFollow(null);
       handleStatus(r.askId, r.status, r.episodeId ?? null, r.reason);
     } catch (e) {
       setPhase({ kind: "message", emoji: "🛠️", title: "Something went wrong", body: (e as Error).message });
@@ -193,6 +215,12 @@ export default function KidPage() {
       </header>
 
       <section className="flex flex-1 flex-col items-center justify-center gap-6 py-6 text-center">
+        {follow && (phase.kind === "idle" || phase.kind === "confirm") && (
+          <div className="flex items-center gap-2 rounded-full bg-sky/15 px-4 py-2 text-sm font-semibold">
+            <span>🔗 Asking more about: {follow.title}</span>
+            <button aria-label="Not a follow-up" className="text-slate-500" onClick={() => setFollow(null)}>✕</button>
+          </div>
+        )}
         <div className="flex items-end gap-3">
           <Otto size={88} />
           <div className="bob"><Cheko size={72} /></div>

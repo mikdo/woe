@@ -79,6 +79,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const facts = (ep.facts?.facts ?? []) as Fact[];
   const checks = (ep.facts?.checks ?? []) as ClaimCheck[];
+  // The topic trail: what this followed on from, and what followed on from it.
+  const [{ data: parent }, { data: children }] = await Promise.all([
+    ep.parent_episode_id
+      ? db().from("episodes").select("id, title, question").eq("id", ep.parent_episode_id).eq("status", "ready").maybeSingle()
+      : Promise.resolve({ data: null }),
+    db()
+      .from("episodes")
+      .select("id, title, question")
+      .eq("parent_episode_id", ep.id)
+      .eq("status", "ready")
+      .or(`shared.eq.true,created_by_family.eq.${auth.family.id}`)
+      .limit(6),
+  ]);
+
   return Response.json({
     episode: {
       id: ep.id,
@@ -92,6 +106,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       new_words: script.new_words ?? [],
       grownup_fact: script.grownup_fact ?? null,
       activities: script.activities ?? [],
+      follow_ups: script.follow_ups ?? [],
+      parent: parent ? { id: parent.id, title: parent.title ?? parent.question } : null,
+      children: (children ?? []).map((c) => ({ id: c.id, title: c.title ?? c.question })),
     },
     audio: { url, duration: mix.duration, cues: mix.cues },
     sources: facts.map((f) => ({ id: f.id, fact: f.fact, url: f.source_url, title: f.source_title })),

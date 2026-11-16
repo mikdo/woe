@@ -43,6 +43,7 @@ export const SCRIPT_SCHEMA = obj({
   ambience: str,
   art_prompt: str,
   talk_about_it: strArr,
+  follow_ups: strArr,
   grownup_fact: str,
   activities: {
     type: "array",

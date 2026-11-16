@@ -20,6 +20,9 @@ type PlayData = {
     new_words: { word: string; say_as: string }[];
     grownup_fact: string | null;
     activities: Activity[];
+    follow_ups: string[];
+    parent: { id: string; title: string } | null;
+    children: { id: string; title: string }[];
   };
   audio: { url: string; duration: number; cues: Cue[] };
   sources: { id: string; fact: string; url: string; title?: string }[];
@@ -156,6 +159,38 @@ function Player() {
         </button>
       )}
       {done && <p className="text-center font-display text-2xl">Keep wondering! 🌏</p>}
+
+      <section className="card space-y-3">
+        <h2 className="text-xl font-semibold">Wonder more 🎩</h2>
+        {data.episode.follow_ups.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {data.episode.follow_ups.map((q) => (
+              <Link key={q} href={`/kid/${kid ?? "all"}?follow=${id}&q=${encodeURIComponent(q)}`} className="btn-soft px-4 py-2 text-left text-base">
+                {q}
+              </Link>
+            ))}
+          </div>
+        )}
+        <Link href={`/kid/${kid ?? "all"}?follow=${id}`} className="btn-primary flex items-center justify-center gap-2 py-3">
+          🎤 Ask more about this
+        </Link>
+        {(data.episode.parent || data.episode.children.length > 0) && (
+          <div className="space-y-1 pt-1 text-sm">
+            {data.episode.parent && (
+              <p>
+                <span className="text-slate-500">Before this: </span>
+                <Link className="font-semibold underline" href={`/e/${data.episode.parent.id}${kid ? `?kid=${kid}` : ""}`}>{data.episode.parent.title}</Link>
+              </p>
+            )}
+            {data.episode.children.map((c) => (
+              <p key={c.id}>
+                <span className="text-slate-500">Next: </span>
+                <Link className="font-semibold underline" href={`/e/${c.id}${kid ? `?kid=${kid}` : ""}`}>{c.title}</Link>
+              </p>
+            ))}
+          </div>
+        )}
+      </section>
 
       {data.episode.activities.length > 0 && (
         <section className={`card space-y-3 ${done ? "ring-4 ring-sun" : ""}`}>

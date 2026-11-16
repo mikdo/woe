@@ -74,13 +74,26 @@ CHEKO CHANGE-O (kids love this; keep it simple so they're never confused)
 
 ${BAND_RULES[band]}
 
+THE WONDER HAT ADVENTURE
+Every episode is a little pretend trip. Otto's bucket hat is the Wonder Hat: it spins and whisks Otto, Cheko and the listener off to where the answer is
+(space, a crocodile river, inside a beehive, under the sea, the outback at night, inside your tummy...).
+- Going: after Cheko's CHANGE-O, Otto: "Hold onto your hats! Wonder Hat... SPIN!" Set that segment's fx to a playful whooshing spin.
+  Then arrive and describe the place with the senses (what we see, hear, feel) in a line or two.
+- The trip carries the learning: each explainer is a stop or a moment on the trip, and the facts are still the point.
+  Littles: one place, one or two moments. Bigs and Explorers: two or three stops.
+- Make clear it's pretend ("Let's imagine..."), and keep it safe: watch wild animals from a safe boat or far back,
+  wear a space suit in space, never touch dangerous things, and never suggest kids try it for real.
+- Cheko's form fits the trip (a little astronaut for space, a baby croc for the river) and he stays that way.
+- Coming home: before the recap, "Wonder Hat... SPIN!" back home (fx: the spin again), landing somewhere cosy.
+- Choose ambience for the destination (the swamp, the hive, a quiet hum in space).
+
 STRUCTURE (one segment per beat, in this order)
 1 hello: Otto: "Hey hey! Welcome to What On Earth! I'm Otto." Cheko says a quick hi. (The app then adds who asked today's question, so don't mention the asker.)
 2 hook: Otto: "Whoaaa... what on earth is..." (pause for the kids to shout "WHOA!") then the question. Cheko transforms here (see CHEKO CHANGE-O).
-3 framing: why it's puzzling, an "imagine..." moment.
+3 framing: the Wonder Hat trip there (see THE WONDER HAT ADVENTURE), and why the question is puzzling.
 4 explainer (x2 or x3): mini question -> pause -> answer. Analogies to things toddlers touch.
 5 new_word (inside or after an explainer): PEER - say it, break into syllables, "Can you say it?", pause, praise, use it again.
-6 recap: the main ideas, one short line each.
+6 recap: back home after the Wonder Hat trip, the main ideas, one short line each.
 7 game segments: beat "game_tf", "game_quiz", "game_wyr" or "game_riddle". Put each answer in "answer". sfx "drumroll" before reveals, "ding" for true/correct, "boing" for false.
    In games Cheko should sometimes guess right; when he's wrong it's a sensible guess.
 8 final_answer: the big answer in one sentence.
@@ -112,6 +125,8 @@ RULES
 - Category must be one of: ${CATEGORY_LIST}. ${FORM_RULES} (cheko_form only picks the closest picture for the app; what he says he becomes follows CHEKO CHANGE-O).
 - art_prompt: a cover scene for the topic in one or two sentences, no people's faces needed, no text.
 - talk_about_it: 3 short prompts a parent can use afterwards at dinner or in the car.
+- follow_ups: 3 short questions in a child's words that this episode naturally leads to, each a different direction
+  (e.g. after honey: "Why do bees dance?", "Do all bees make honey?", "What's inside a beehive?"). Not answered in this episode.
 - ambience: one short line describing a gentle background soundscape for the topic's setting, to loop softly under the episode
   (e.g. "Australian bush at dawn, distant birds, soft breeze"). Calm, never scary, no voices, no music.
 - sound effects: on 3-5 segments set "fx" to a short real-world sound that brings that moment to life
@@ -133,12 +148,25 @@ Return ONLY JSON:
  "new_words":[{"word":"scatter","say_as":"SCAT-er"}],
  "segments":[{"beat":"hello","lines":[{"speaker":"otto","text":"..."},{"speaker":"cheko","text":"..."}],"facts":[],"pause_after_s":0,"sfx":null,"fx":null,"answer":null}],
  "ambience":"...",
- "art_prompt":"...","talk_about_it":["...","...","..."],"grownup_fact":"...",
+ "art_prompt":"...","talk_about_it":["...","...","..."],"follow_ups":["...","...","..."],"grownup_fact":"...",
  "activities":[{"kind":"make","title":"...","minutes":10,"need":["..."],"steps":["...","..."],"talk":"...","safety":null}]}`;
 }
 
-export function scriptUser(question: string, facts: Fact[]) {
-  return `Question: ${question}\n\nFacts you may use:\n${facts.map((f) => `${f.id}: ${f.fact}`).join("\n")}`;
+export type PreviousEpisode = { title: string; question: string; learned: string };
+
+export function scriptUser(question: string, facts: Fact[], previous?: PreviousEpisode | null) {
+  const before = previous
+    ? `\n\nTHIS IS A FOLLOW-UP. The kids just heard "${previous.title}" (${previous.question}) and asked more.
+What they already learned: ${previous.learned}
+Open with a quick, warm callback in the hook ("Last time we found out... and now you want to know..."), then build on it.
+Don't re-explain what they already know, just remind them in a line where it helps.`
+    : "";
+  return `Question: ${question}${before}\n\nFacts you may use:\n${facts.map((f) => `${f.id}: ${f.fact}`).join("\n")}`;
+}
+
+/** Research brief for a follow-up, so new facts go further instead of repeating. */
+export function researchQuestion(question: string, previous?: PreviousEpisode | null) {
+  return previous ? `${question}\n(Follow-up to "${previous.question}". Already covered: ${previous.learned}. Find NEW facts that go further.)` : question;
 }
 
 export const CLAIMS_SYSTEM = `List every checkable factual claim in this children's episode script, including the correct answers of every game

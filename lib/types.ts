@@ -68,6 +68,8 @@ export type Script = {
   segments: Segment[];
   art_prompt: string;
   talk_about_it: string[];
+  /** Three questions this episode naturally leads to, for "ask more". */
+  follow_ups?: string[];
   grownup_fact?: string;
   activities?: Activity[];
   ambience?: string;

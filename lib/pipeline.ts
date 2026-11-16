@@ -13,6 +13,8 @@ import {
   SAME_QUESTION_SYSTEM,
   TRIAGE_SYSTEM,
   fixUser,
+  researchQuestion,
+  type PreviousEpisode,
   FIX_SYSTEM,
   introLines,
   outroLines,
@@ -127,6 +129,7 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
   const { data: ep } = await db().from("episodes").select("*").eq("id", episodeId).single();
   if (!ep || ep.status === "ready") return;
   const band = ep.band as Band;
+  const previous = await previousEpisode(ep.parent_episode_id as string | null);
   const started = Date.now();
   // Functions stop at 5 minutes: past ~3, hand the rest to a fresh run.
   const outOfTime = () => Date.now() - started > 170_000;
@@ -138,11 +141,11 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       await setStage(episodeId, "researching");
       costStep("research");
       // Gemini researches with Google Search (much cheaper); Claude's web search is the fallback.
-      facts = await researchFacts(RESEARCH_SYSTEM, ep.question, band).catch(async (e) => {
+      facts = await researchFacts(RESEARCH_SYSTEM, researchQuestion(ep.question, previous), band).catch(async (e) => {
         console.error("Gemini research failed, using Claude", episodeId, e);
         const r = await claudeJson<{ facts: Fact[] }>({
           system: RESEARCH_SYSTEM,
-          user: `Question from a child: ${ep.question}\nAge band: ${band}`,
+          user: `Question from a child: ${researchQuestion(ep.question, previous)}\nAge band: ${band}`,
           webSearch: true,
           maxTokens: 16000,
         });
@@ -161,10 +164,10 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       if (!script) {
         await setStage(episodeId, "writing");
         costStep("script");
-        script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+        script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
         if (!scriptLooksComplete(script)) {
           console.error("script incomplete, writing again", episodeId);
-          script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+          script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
         }
         if (!scriptLooksComplete(script)) throw new Error("The script came back incomplete");
         await db().from("episodes").update({ script }).eq("id", episodeId);
@@ -347,6 +350,20 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
     await setStage(episodeId, "error", { error: message.slice(0, 500) });
     throw e;
   }
+}
+
+/** What the kids learned in the episode a follow-up builds on. */
+async function previousEpisode(id: string | null): Promise<PreviousEpisode | null> {
+  if (!id) return null;
+  const { data } = await db().from("episodes").select("title, question, script").eq("id", id).maybeSingle();
+  const script = data?.script as Script | null;
+  if (!data || !script) return null;
+  const said = (beats: string[]) =>
+    script.segments
+      .filter((s) => beats.includes(s.beat))
+      .flatMap((s) => s.lines.map((l) => l.text.replace(/\[[^\]]+\]\s*/g, "")))
+      .join(" ");
+  return { title: data.title ?? data.question, question: data.question, learned: said(["recap", "final_answer"]).slice(0, 1200) };
 }
 
 /** A real episode has a handful of segments, each with something said in it. */
