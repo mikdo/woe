@@ -208,7 +208,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     // 5. Voice + art, in parallel
     await setStage(episodeId, "recording");
     const segments = script.segments;
-    const voice = inBatches(segments, 4, async (seg, i) => {
+    const voice = inBatches(segments, 2, async (seg, i) => {
       if (seg.audio_path || outOfTime()) return;
       const lines = seg.lines.map((l) => ({ speaker: l.speaker, text: applyAliases(l.text, rules) }));
       const bytes = await speak(lines);
@@ -223,7 +223,13 @@ export async function produceEpisode(episodeId: string): Promise<void> {
           await upload("shared", path, png, "image/png");
           return path;
         });
-    const [, artPath] = await Promise.all([voice, art.catch(() => null)]);
+    const [, artPath] = await Promise.all([
+      voice,
+      art.catch((e) => {
+        console.error("cover art failed", episodeId, e);
+        return null;
+      }),
+    ]);
     if (segments.some((sg) => !sg.audio_path)) {
       // Save the recorded segments and carry on in a fresh run.
       await db().from("episodes").update({ script: { ...script, segments }, art_path: artPath }).eq("id", episodeId);

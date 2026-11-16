@@ -25,8 +25,8 @@ export async function speak(lines: { speaker: Speaker; text: string }[]): Promis
       return await speakOnce(lines);
     } catch (e) {
       const m = e instanceof Error ? e.message : "";
-      if (attempt >= 2 || !/\b(429|500|502|503|504)\b/.test(m)) throw e;
-      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+      if (attempt >= 5 || !/\b(409|429|500|502|503|504)\b/.test(m)) throw e;
+      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1) + Math.random() * 2000));
     }
   }
 }
