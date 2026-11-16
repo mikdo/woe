@@ -25,7 +25,7 @@ const SAMPLES: Line[][] = [
     { speaker: "cheko", text: "TRUE! Definitely true. One hundred percent." },
     { speaker: "otto", text: "Ooh, good guess, Cheko… but it's false! Lots of volcanoes are under the ocean." },
     { speaker: "cheko", text: "[gasps] Underwater volcanoes?! Whoa!" },
-    { speaker: "otto", text: "Keep asking questions, and stay curious!" },
+    { speaker: "otto", text: "Keep wondering, and keep asking... what on earth?" },
   ],
 ];
 

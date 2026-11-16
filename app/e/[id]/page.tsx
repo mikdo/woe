@@ -155,7 +155,7 @@ function Player() {
           🤔 What do you think? <span className="text-base text-slate-500 underline">skip</span>
         </button>
       )}
-      {done && <p className="text-center font-display text-2xl">Stay curious! 🌏</p>}
+      {done && <p className="text-center font-display text-2xl">Keep wondering! 🌏</p>}
 
       {data.episode.activities.length > 0 && (
         <section className={`card space-y-3 ${done ? "ring-4 ring-sun" : ""}`}>

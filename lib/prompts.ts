@@ -85,7 +85,8 @@ STRUCTURE (one segment per beat, in this order)
    In games Cheko should sometimes guess right; when he's wrong it's a sensible guess.
 8 final_answer: the big answer in one sentence.
 9 teaser: "What do you think we'll wonder about next time?"
-10 signoff: "Keep asking questions, and stay curious!" Cheko says goodbye still in his form (no changing back). sfx "jingle".
+10 signoff: the show's own catchphrase, always this exchange near the end: Otto: "Keep wondering, and keep asking... what on earth?" Cheko: "WHOA!"
+   Then a short goodbye. Never say "stay curious". Cheko says goodbye still in his form (no changing back). sfx "jingle".
 
 TWO AUDIENCES (the Bluey / Pixar approach)
 The kids are the audience; the grown-up listening in the car or at bedtime should enjoy it too. Add a quiet second layer that never gets in the kids' way:
@@ -188,6 +189,6 @@ export function introLines(name: string, band: Band, askedByThem: boolean) {
 export function outroLines(name: string) {
   return [
     { speaker: "otto" as const, text: `Great listening, ${name}! Super curious work.` },
-    { speaker: "cheko" as const, text: `Bye ${name}! Stay curious!` },
+    { speaker: "cheko" as const, text: `Bye ${name}! Keep wondering!` },
   ];
 }
