@@ -1,5 +1,7 @@
 import { db, type Family } from "@/lib/supabase/admin";
+import { after } from "next/server";
 import { proceedAsk } from "@/lib/server/asks";
+import { produceEpisode } from "@/lib/pipeline";
 import type { Band } from "@/lib/types";
 
 export const maxDuration = 300;
@@ -17,6 +19,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const key = process.env.SEED_KEY;
   if (!key || url.searchParams.get("key") !== key) return Response.json({ error: "Not found" }, { status: 404 });
+  const resume = url.searchParams.get("resume");
+  if (resume) {
+    await db().from("episodes").update({ stage: "resuming", error: null }).eq("id", resume);
+    after(() => produceEpisode(resume).catch((e) => console.error("resume failed", resume, e)));
+    return Response.json({ resumed: resume });
+  }
   const i = Number(url.searchParams.get("i") ?? "0");
   const seed = SEEDS[i];
   if (!seed) return Response.json({ error: "No such seed" }, { status: 400 });
