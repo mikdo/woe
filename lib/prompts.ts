@@ -133,16 +133,26 @@ export const CLAIMS_SYSTEM = `List every checkable factual claim in this childre
 Include facts tucked inside jokes and the grownup_fact. Skip greetings, opinions and the transformation bits. Return ONLY JSON: {"claims":["...","..."]}`;
 
 export function fixUser(script: Script, problems: ClaimCheck[], facts: Fact[]) {
-  return `This script failed the fact check. Rewrite ONLY what is needed so every claim is correct or removed, keeping the same structure, tone and JSON format.
+  const segs = script.segments.map((sg, i) => `[${i}] (${sg.beat})\n${sg.lines.map((l) => `${l.speaker}: ${l.text}`).join("\n")}${sg.answer ? `\nanswer: ${sg.answer}` : ""}`);
+  return `This episode script failed the fact check. Fix it by returning ONLY the segments that need to change.
+For each segment you change, give its number and ALL of its new lines (the full segment, same speakers and tone, same length roughly),
+with the wrong or unconfirmed claim corrected using the facts below, or left out. Leave everything else alone.
+If the grown-up fact has a problem, give a corrected grownup_fact, otherwise null.
+
 Problems:
 ${problems.map((p) => `- "${p.claim}" -> ${p.verdict}: ${p.note}`).join("\n")}
 
 Facts you may use:
 ${facts.map((f) => `${f.id}: ${f.fact}`).join("\n")}
 
-Script:
-${JSON.stringify(script)}`;
+Grown-up fact: ${script.grownup_fact ?? ""}
+
+Segments:
+${segs.join("\n\n")}`;
 }
+
+export const FIX_SYSTEM = `You are the editor of "What On Earth?", a warm Australian science show for children with host Otto and sidekick Cheko.
+You make the smallest changes needed so every claim is true, keeping the voice, jokes, pacing and age level. Return JSON only.`;
 
 export const PRONOUNCE_SYSTEM = `You help an Australian English text-to-speech voice pronounce words correctly for children.
 From the script, list ONLY rare words a TTS voice is likely to get wrong: scientific and dinosaur names, unusual place names,

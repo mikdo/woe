@@ -57,3 +57,16 @@ export const SCRIPT_SCHEMA = obj({
     }),
   },
 });
+
+/** A fact-check fix: only the segments that change, so nothing else can get lost. */
+export const FIX_SCHEMA = obj({
+  edits: {
+    type: "array",
+    items: obj({
+      segment: { type: "integer" },
+      lines: { type: "array", items: obj({ speaker: { type: "string", enum: ["otto", "cheko"] }, text: str }) },
+      answer: nullable(str),
+    }),
+  },
+  grownup_fact: nullable(str),
+});

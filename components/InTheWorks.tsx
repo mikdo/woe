@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase/browser";
+import { api, supabase } from "@/lib/supabase/browser";
 import { STAGES, stageProgress } from "@/lib/stages";
 
 type Row = {
@@ -14,6 +14,11 @@ type Row = {
   episodes: { stage: string | null; status: string; title: string | null; updated_at: string | null } | null;
 };
 
+function isStale(r: Row) {
+  const t = r.episodes?.updated_at ? new Date(r.episodes.updated_at).getTime() : 0;
+  return r.status === "generating" && t > 0 && Date.now() - t > 8 * 60 * 1000;
+}
+
 /**
  * Episodes being made for this family right now, with where they're up to.
  * Shows a "ready" card for a few minutes after one finishes.
@@ -21,6 +26,14 @@ type Row = {
 export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () => void }) {
   const [rows, setRows] = useState<Row[]>([]);
   const seen = useRef(new Set<string>());
+  const retried = useRef(new Set<string>());
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function retry(episodeId: string) {
+    setBusy(episodeId);
+    await api(`/api/episodes/${episodeId}/resume`, { method: "POST" }).catch(() => null);
+    setTimeout(() => setBusy(null), 4000);
+  }
 
   useEffect(() => {
     let stop = false;
@@ -40,6 +53,12 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
       if (kidId && kidId !== "all") list = list.filter((r) => r.kid_id === kidId || r.for_all);
       if (kidId === "all") list = list.filter((r) => r.for_all);
       for (const r of list) {
+        // A stalled or failed episode gets one automatic restart per visit.
+        const stalled = r.status === "generating" && r.episode_id && (r.episodes?.stage === "error" || isStale(r));
+        if (stalled && !retried.current.has(r.episode_id!)) {
+          retried.current.add(r.episode_id!);
+          api(`/api/episodes/${r.episode_id}/resume`, { method: "POST" }).catch(() => null);
+        }
         if (r.status === "ready" && seen.current.has(`${r.id}:generating`) && !seen.current.has(`${r.id}:ready`)) onReady?.();
         seen.current.add(`${r.id}:${r.status}`);
       }
@@ -59,7 +78,7 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
       {rows.map((r) => {
         const stage = r.episodes?.stage ?? "queued";
         const ready = r.status === "ready";
-        const failed = stage === "error" || stage === "needs_review";
+        const failed = stage === "error" || stage === "needs_review" || isStale(r);
         const href = r.episode_id ? `/e/${r.episode_id}${r.for_all ? "?kid=all" : r.kid_id ? `?kid=${r.kid_id}` : ""}` : "#";
         const body = (
           <div className={`card flex items-center gap-3 p-3 ${ready ? "ring-4 ring-sun" : ""}`}>
@@ -67,8 +86,19 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-lg font-semibold">{r.episodes?.title ?? r.text}</p>
               <p className="text-sm text-slate-600">
-                {ready ? "Ready to play!" : failed ? "Needs a grown-up to check it" : STAGES[stage] ?? "Making it…"}
+                {ready
+                  ? "Ready to play!"
+                  : stage === "needs_review"
+                    ? "A grown-up needs to check a fact"
+                    : failed
+                      ? "Got stuck. Trying again…"
+                      : STAGES[stage] ?? "Making it…"}
               </p>
+              {failed && stage !== "needs_review" && r.episode_id && (
+                <button className="mt-1 text-sm font-semibold text-sky-700 underline" disabled={busy === r.episode_id} onClick={() => retry(r.episode_id!)}>
+                  {busy === r.episode_id ? "Restarting…" : "Try again"}
+                </button>
+              )}
               {!ready && !failed && (
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-orange-100">
                   <div className="h-full rounded-full bg-sun transition-all duration-700" style={{ width: `${stageProgress(stage) * 100}%` }} />

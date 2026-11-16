@@ -5,7 +5,7 @@ import { claudeJson } from "@/lib/ai/claude";
 import { checkClaims, embed, makeArt, researchFacts } from "@/lib/ai/gemini";
 import { costStep, trackCosts } from "@/lib/ai/cost";
 import { applyAliases, music, soundEffect, speak } from "@/lib/ai/eleven";
-import { CLAIMS_SCHEMA, PRONOUNCE_SCHEMA, SAME_SCHEMA, SCRIPT_SCHEMA, TRIAGE_SCHEMA } from "@/lib/schemas";
+import { CLAIMS_SCHEMA, FIX_SCHEMA, PRONOUNCE_SCHEMA, SAME_SCHEMA, SCRIPT_SCHEMA, TRIAGE_SCHEMA } from "@/lib/schemas";
 import {
   CLAIMS_SYSTEM,
   PRONOUNCE_SYSTEM,
@@ -13,6 +13,7 @@ import {
   SAME_QUESTION_SYSTEM,
   TRIAGE_SYSTEM,
   fixUser,
+  FIX_SYSTEM,
   introLines,
   outroLines,
   scriptSystem,
@@ -161,6 +162,11 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
         await setStage(episodeId, "writing");
         costStep("script");
         script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+        if (!scriptLooksComplete(script)) {
+          console.error("script incomplete, writing again", episodeId);
+          script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+        }
+        if (!scriptLooksComplete(script)) throw new Error("The script came back incomplete");
         await db().from("episodes").update({ script }).eq("id", episodeId);
         if (outOfTime()) return continueLater(episodeId);
       }
@@ -196,7 +202,13 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
           await db().from("asks").update({ status: "failed" }).eq("episode_id", episodeId).eq("status", "generating");
           return;
         }
-        script = await claudeJson<Script>({ system: scriptSystem(band), user: fixUser(script, problems, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+        const fix = await claudeJson<{ edits: { segment: number; lines: Script["segments"][number]["lines"]; answer: string | null }[]; grownup_fact: string | null }>({
+          system: FIX_SYSTEM,
+          user: fixUser(script, problems, facts),
+          maxTokens: 12000,
+          schema: FIX_SCHEMA,
+        });
+        script = applyFix(script, fix);
       }
       await db()
         .from("episodes")
@@ -252,6 +264,7 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       const path = `episodes/${episodeId}/${rev}-seg-${String(i).padStart(2, "0")}.mp3`;
       await upload("shared", path, bytes, "audio/mpeg");
       seg.audio_path = path;
+      await db().from("episodes").update({ updated_at: new Date().toISOString() }).eq("id", episodeId);
     });
     const art = ep.art_path
       ? Promise.resolve(ep.art_path as string)
@@ -310,7 +323,8 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       script.sound_done = true;
     }
 
-    // 7. Done
+    // 7. Done (never mark an empty episode as ready)
+    if (!scriptLooksComplete(script) || segments.some((sg) => !sg.audio_path)) throw new Error("Episode audio is incomplete");
     const { data: fam } = await db().from("families").select("is_admin").eq("id", ep.created_by_family).maybeSingle();
     await db()
       .from("episodes")
@@ -333,6 +347,28 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
     await setStage(episodeId, "error", { error: message.slice(0, 500) });
     throw e;
   }
+}
+
+/** A real episode has a handful of segments, each with something said in it. */
+export function scriptLooksComplete(script: Script | null | undefined): script is Script {
+  const segs = script?.segments ?? [];
+  return segs.length >= 5 && segs.every((sg) => sg.lines?.length && sg.lines.some((l) => l.text?.trim()));
+}
+
+/** Applies a fact-check fix to just the segments it names. */
+function applyFix(
+  script: Script,
+  fix: { edits?: { segment: number; lines: Script["segments"][number]["lines"]; answer: string | null }[]; grownup_fact: string | null },
+): Script {
+  const segments = script.segments.map((sg) => ({ ...sg }));
+  for (const e of fix.edits ?? []) {
+    const seg = segments[e.segment];
+    if (!seg || !e.lines?.length || !e.lines.some((l) => l.text?.trim())) continue;
+    seg.lines = e.lines;
+    if (e.answer !== null && e.answer !== undefined) seg.answer = e.answer;
+    delete seg.audio_path;
+  }
+  return { ...script, segments, grownup_fact: fix.grownup_fact?.trim() ? fix.grownup_fact : script.grownup_fact };
 }
 
 /** Ends a segment on Cheko's "CHANGE-O!" so the transformation sound lands right after it. */
