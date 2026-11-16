@@ -16,7 +16,7 @@ type Phase =
   | { kind: "idle" }
   | { kind: "recording" }
   | { kind: "hearing" }
-  | { kind: "confirm"; text: string; source: "voice" | "typed" }
+  | { kind: "confirm"; text: string; source: "voice" | "typed"; options?: string[]; heard?: string }
   | { kind: "sending"; text: string }
   | { kind: "thinking"; askId: string; episodeId: string | null; stage: string }
   | { kind: "message"; emoji: string; title: string; body: string; approveAskId?: string };
@@ -101,9 +101,9 @@ export default function KidPage() {
         try {
           const form = new FormData();
           form.append("audio", blob, "question");
-          const { text } = await api<{ text: string }>("/api/transcribe", { method: "POST", body: form });
-          if (!text) throw new Error("empty");
-          setPhase({ kind: "confirm", text, source: "voice" });
+          const { text, options } = await api<{ text: string; options: string[] }>("/api/transcribe", { method: "POST", body: form });
+          if (!text || !options?.length) throw new Error("empty");
+          setPhase({ kind: "confirm", text: options[0], source: "voice", options, heard: text });
         } catch {
           setPhase({ kind: "message", emoji: "👂", title: "Otto didn't quite hear that", body: "Let's try again, nice and loud!" });
         }
@@ -260,11 +260,36 @@ export default function KidPage() {
 
         {phase.kind === "confirm" && (
           <>
-            <p className="text-slate-500">Did you ask…</p>
-            <p className="font-display text-3xl font-semibold">&ldquo;{phase.text}&rdquo;</p>
-            <div className="flex gap-4">
-              <button className="btn-soft h-20 w-20 rounded-full text-3xl" onClick={() => setPhase({ kind: "idle" })} aria-label="Try again">🔁</button>
-              <button className="btn-primary h-20 px-8 text-2xl" onClick={() => send(phase.text, phase.source)}>Yes! ✓</button>
+            {(phase.options?.length ?? 0) > 1 ? (
+              <>
+                <p className="text-slate-500">Do you want to know…</p>
+                <div className="flex w-full flex-col gap-3">
+                  {phase.options!.map((o) => (
+                    <button
+                      key={o}
+                      className="card w-full text-left font-display text-2xl font-semibold transition active:scale-[0.98]"
+                      onClick={() => send(o, phase.source)}
+                    >
+                      {o}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-slate-500">Do you want to know…</p>
+                <p className="font-display text-3xl font-semibold">&ldquo;{phase.text}&rdquo;</p>
+              </>
+            )}
+            {phase.heard && phase.heard !== phase.text && (
+              <p className="max-w-xs text-sm text-slate-400">Otto heard: &ldquo;{phase.heard}&rdquo;</p>
+            )}
+            <div className="flex flex-wrap justify-center gap-3">
+              <button className="btn-soft" onClick={() => setPhase({ kind: "idle" })}>↺ Ask again</button>
+              <button className="btn-soft" onClick={() => { setTyped(phase.text); setPhase({ kind: "idle" }); }}>✏️ Change it</button>
+              {(phase.options?.length ?? 0) <= 1 && (
+                <button className="btn-primary px-8 text-xl" onClick={() => send(phase.text, phase.source)}>Yes! ✓</button>
+              )}
             </div>
           </>
         )}

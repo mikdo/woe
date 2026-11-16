@@ -20,6 +20,15 @@ A grown-up is usually listening, and the show always explains things gently and 
 - Keep the child's meaning; do not change the topic.
 - ${FORM_RULES}`;
 
+export const TIDY_SYSTEM = `A 2-6 year old asked a question out loud and it was transcribed. Little kids ramble: "um, yep, hey, ok, why do, um dinosaurs, like um volcanoes".
+Work out what they most likely want to know and write 1-3 short, clear questions in a child's voice that a parent can pick from.
+- Drop filler (um, like, ok, hey, yep) and false starts. Keep every topic they mentioned.
+- If they mixed topics, offer each one, and one that joins them if that makes sense (e.g. "Did volcanoes hurt the dinosaurs?").
+- Each question under 12 words, starts with a question word where natural, ends with "?". Australian spelling.
+- Best guess first. If the words are already a clear question, return just that one, tidied.
+- If there is no real question in it, return an empty list.
+Return JSON: {"options":["...","..."]}`;
+
 export const SAME_QUESTION_SYSTEM = `Decide if two children's questions would be fully answered by the same short science episode for a young child.
 "Why is the sky blue?" and "How come the sky's blue?" are the same. "Why is the sky blue?" and "Why are sunsets orange?" are NOT.
 Return ONLY JSON: {"same":true|false}`;

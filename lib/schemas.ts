@@ -17,6 +17,9 @@ export const TRIAGE_SCHEMA = obj({
   cheko_form: { type: "string", enum: ["otter", "dino", "robot", "dragon", "doctor", "diver"] },
 });
 
+/** Clean question options from a rambling little-kid recording. */
+export const TIDY_SCHEMA = obj({ options: strArr });
+
 export const SAME_SCHEMA = obj({ same: { type: "boolean" } });
 
 export const CLAIMS_SCHEMA = obj({ claims: strArr });
