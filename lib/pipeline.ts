@@ -4,6 +4,7 @@ import { db, type Family } from "@/lib/supabase/admin";
 import { claudeJson } from "@/lib/ai/claude";
 import { checkClaims, embed, makeArt } from "@/lib/ai/gemini";
 import { applyAliases, speak } from "@/lib/ai/eleven";
+import { CLAIMS_SCHEMA, PRONOUNCE_SCHEMA, SAME_SCHEMA, SCRIPT_SCHEMA, TRIAGE_SCHEMA } from "@/lib/schemas";
 import {
   CLAIMS_SYSTEM,
   PRONOUNCE_SYSTEM,
@@ -33,7 +34,8 @@ export async function triage(text: string, band: Band): Promise<Triage> {
     model: config.claudeFast,
     system: TRIAGE_SYSTEM,
     user: `Age band: ${band}\nChild's question (from speech-to-text or a parent): "${text}"`,
-    maxTokens: 600,
+    maxTokens: 4000,
+    schema: TRIAGE_SCHEMA,
   });
 }
 
@@ -59,7 +61,8 @@ export async function findMatch(
       model: config.claudeFast,
       system: SAME_QUESTION_SYSTEM,
       user: `Question A: ${question}\nQuestion B: ${c.variant_text}`,
-      maxTokens: 50,
+      maxTokens: 2000,
+      schema: SAME_SCHEMA,
     });
     if (judge.same) return { episodeId: c.episode_id, embedding };
   }
@@ -112,6 +115,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
         system: RESEARCH_SYSTEM,
         user: `Question from a child: ${ep.question}\nAge band: ${band}`,
         webSearch: true,
+        maxTokens: 16000,
       });
       facts = r.facts;
       await db().from("episodes").update({ facts: { facts, checks: [] } }).eq("id", episodeId);
@@ -123,7 +127,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     if (ep.fact_status !== "passed") {
       if (!script) {
         await setStage(episodeId, "writing");
-        script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 12000 });
+        script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
       }
       for (let loop = 0; loop <= config.maxFixLoops; loop++) {
         await setStage(episodeId, loop === 0 ? "checking" : "fixing", { script });
@@ -131,7 +135,8 @@ export async function produceEpisode(episodeId: string): Promise<void> {
           model: config.claudeFast,
           system: CLAIMS_SYSTEM,
           user: JSON.stringify({ segments: script.segments, grownup_fact: script.grownup_fact ?? null }),
-          maxTokens: 3000,
+          maxTokens: 8000,
+          schema: CLAIMS_SCHEMA,
         });
         checks = await checkClaims(ep.question, claims);
         const problems = checks.filter((c) => c.verdict === "wrong" || c.verdict === "unsupported");
@@ -151,7 +156,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
           await db().from("asks").update({ status: "failed" }).eq("episode_id", episodeId).eq("status", "generating");
           return;
         }
-        script = await claudeJson<Script>({ system: scriptSystem(band), user: fixUser(script, problems, facts), maxTokens: 12000 });
+        script = await claudeJson<Script>({ system: scriptSystem(band), user: fixUser(script, problems, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
       }
       await db()
         .from("episodes")
@@ -174,7 +179,8 @@ export async function produceEpisode(episodeId: string): Promise<void> {
       model: config.claudeFast,
       system: PRONOUNCE_SYSTEM,
       user: script.segments.flatMap((s) => s.lines.map((l) => l.text)).join("\n"),
-      maxTokens: 1500,
+      maxTokens: 6000,
+      schema: PRONOUNCE_SCHEMA,
     });
     // The global dictionary grows with new words (unapproved); existing entries are never overwritten.
     const known = new Set((await pronunciationRules(null)).map((r) => r.word.toLowerCase()));
