@@ -138,7 +138,7 @@ function MiniPlayer() {
   const href = `/e/${p.track.id}${p.track.kid ? `?kid=${p.track.kid}` : ""}`;
   const pct = p.track.duration ? (p.time / p.track.duration) * 100 : 0;
   return (
-    <div style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }} className="fixed inset-x-3 z-50 mx-auto max-w-xl overflow-hidden rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,.15)]">
+    <div style={{ bottom: "calc(var(--nav-h) + 0.5rem + env(safe-area-inset-bottom))" }} className="fixed inset-x-3 z-50 mx-auto max-w-xl overflow-hidden rounded-3xl bg-white shadow-[0_6px_24px_rgba(0,0,0,.15)]">
       <div className="h-1 bg-sun" style={{ width: `${pct}%` }} />
       <div className="flex items-center gap-3 p-2 pr-3">
         <Link href={href} className="flex min-w-0 flex-1 items-center gap-3">

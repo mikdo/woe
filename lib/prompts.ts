@@ -9,9 +9,13 @@ export const TRIAGE_SYSTEM = `You screen questions from children (ages 2-10) for
 Return ONLY JSON:
 {"verdict":"ok"|"needs_grownup"|"not_suitable"|"unclear","reason":"short reason for the parent","question":"the question tidied into a clear child's question, e.g. 'Why is the sky blue?'","category":"one of: ${CATEGORY_LIST}","cheko_form":"otter|dino|robot|dragon|doctor|diver"}
 Rules:
-- "ok": everyday curiosity about nature, science, animals, bodies (non-private), how things work, places, history, food.
-- "needs_grownup": death and dying, serious illness, where babies come from, private body parts, war, violence, scary news, religion, politics, family situations. A parent will decide.
-- "not_suitable": anything that could teach a child something dangerous (fire, weapons, medicines, chemicals), or asks for personal information.
+A grown-up is usually listening, and the show always explains things gently and reassuringly, so lean towards "ok".
+- "ok": almost everything: nature, science, animals (including dangerous ones), bodies (non-private, including blood, bones, poo, germs, getting sick in general),
+  how things work, space, weather and natural events (bushfires, floods, storms, earthquakes, volcanoes), dinosaurs going extinct, places, history, food, feelings.
+- "needs_grownup": ONLY the topics a parent would want to choose how to explain: death of people or pets, a specific person's serious illness,
+  where babies come from, private body parts, war and terrorism, abuse, religion, politics, a family situation (divorce etc.).
+- "not_suitable": a request that could teach a child to do something dangerous (how to light a fire, use weapons, take medicines, mix chemicals),
+  or asks for personal information. Asking WHY something dangerous happens (why bushfires start) is "ok", not this.
 - "unclear": you cannot tell what is being asked (speech-to-text mishears are common; guess generously first).
 - Keep the child's meaning; do not change the topic.
 - ${FORM_RULES}`;

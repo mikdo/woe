@@ -23,11 +23,8 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-8 p-6">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-center">
         <Logo size={44} />
-        <Link href="/grownups" className="text-sm font-semibold text-slate-500 underline-offset-4 hover:underline">
-          Grown-ups
-        </Link>
       </header>
 
       <section className="flex flex-col items-center gap-3 text-center">
@@ -64,7 +61,6 @@ export default function Home() {
 
       <InTheWorks />
 
-      <Link href="/library" className="btn-soft self-center text-xl">📚 Our WOE! library</Link>
     </main>
   );
 }

@@ -19,7 +19,7 @@ type Phase =
   | { kind: "confirm"; text: string; source: "voice" | "typed" }
   | { kind: "sending"; text: string }
   | { kind: "thinking"; askId: string; episodeId: string | null; stage: string }
-  | { kind: "message"; emoji: string; title: string; body: string };
+  | { kind: "message"; emoji: string; title: string; body: string; approveAskId?: string };
 
 
 
@@ -41,6 +41,7 @@ export default function KidPage() {
       : undefined
     : kids.find((k) => k.id === kidId);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [approveGate, setApproveGate] = useState<string | null>(null);
   const [gate, setGate] = useState(false);
   const [typed, setTyped] = useState<string | null>(null);
   const [shelf, setShelf] = useState<EpisodeLite[]>([]);
@@ -113,11 +114,31 @@ export default function KidPage() {
     }
   }
 
+  async function approve(askId: string, yes: boolean) {
+    if (!yes) {
+      await api(`/api/asks/${askId}/approve`, { method: "POST", body: JSON.stringify({ decline: true }) }).catch(() => null);
+      return setPhase({ kind: "idle" });
+    }
+    setPhase({ kind: "thinking", askId, episodeId: null, stage: "queued" });
+    try {
+      const r = await api<{ status: string; episodeId?: string | null; reason?: string | null }>(`/api/asks/${askId}/approve`, { method: "POST", body: "{}" });
+      handleStatus(askId, r.status, r.episodeId ?? null, r.reason);
+    } catch (e) {
+      setPhase({ kind: "message", emoji: "😕", title: "Something went wrong", body: e instanceof Error ? e.message : "Try again" });
+    }
+  }
+
   function handleStatus(askId: string, status: string, episodeId: string | null, reason?: string | null) {
     if ((status === "matched" || status === "ready") && episodeId) return router.push(`/e/${episodeId}?kid=${kidId}`);
     if (status === "generating" || status === "triage") return setPhase({ kind: "thinking", askId, episodeId, stage: "queued" });
     if (status === "needs_grownup")
-      return setPhase({ kind: "message", emoji: "🤗", title: "That's a big question!", body: "Let's ask a grown-up about this one first. They can say yes in the Grown-ups page." });
+      return setPhase({
+        kind: "message",
+        emoji: "🤗",
+        title: "That's a big question!",
+        body: reason ? `Grown-up check: ${reason}` : "Let's ask a grown-up about this one first.",
+        approveAskId: askId,
+      });
     if (status === "not_suitable")
       return setPhase({ kind: "message", emoji: "🙊", title: "Otto can't answer that one", body: "That's a question for a grown-up. Want to ask something else?" });
     if (status === "over_limit")
@@ -233,7 +254,16 @@ export default function KidPage() {
             <div className="text-7xl">{phase.emoji}</div>
             <h1 className="text-3xl font-bold">{phase.title}</h1>
             <p className="max-w-xs text-lg text-slate-600">{phase.body}</p>
-            <button className="btn-primary" onClick={() => setPhase({ kind: "idle" })}>Ask another</button>
+            {phase.approveAskId ? (
+              <div className="flex flex-wrap justify-center gap-2">
+                <button className="btn-primary" onClick={() => (isGrownUpUnlocked() ? approve(phase.approveAskId!, true) : setApproveGate(phase.approveAskId!))}>
+                  Grown-up: make it
+                </button>
+                <button className="btn-soft" onClick={() => approve(phase.approveAskId!, false)}>Not this one</button>
+              </div>
+            ) : (
+              <button className="btn-primary" onClick={() => setPhase({ kind: "idle" })}>Ask another</button>
+            )}
           </>
         )}
       </section>
@@ -272,6 +302,16 @@ export default function KidPage() {
         </section>
       )}
 
+      {approveGate && (
+        <GrownUpGate
+          onCancel={() => setApproveGate(null)}
+          onPass={() => {
+            const id = approveGate;
+            setApproveGate(null);
+            approve(id, true);
+          }}
+        />
+      )}
       {gate && <GrownUpGate onCancel={() => setGate(false)} onPass={() => { setGate(false); setTyped(""); }} />}
     </main>
   );

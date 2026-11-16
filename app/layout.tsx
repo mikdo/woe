@@ -4,6 +4,7 @@ import "@fontsource-variable/nunito";
 import "./globals.css";
 import { RegisterSW } from "@/components/RegisterSW";
 import { PlayerProvider } from "@/components/PlayerProvider";
+import { BottomNav } from "@/components/BottomNav";
 
 export const metadata: Metadata = {
   title: "WOE! What On Earth?",
@@ -24,7 +25,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-AU">
       <body className="min-h-dvh antialiased">
-        <PlayerProvider>{children}</PlayerProvider>
+        <PlayerProvider>
+          {children}
+          <BottomNav />
+        </PlayerProvider>
         <RegisterSW />
       </body>
     </html>
