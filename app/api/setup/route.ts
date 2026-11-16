@@ -11,6 +11,11 @@ export async function POST(req: Request) {
 
   const { data: existing } = await db().from("families").select("*").eq("owner_id", data.user.id).maybeSingle();
   if (existing) return Response.json({ family: existing });
+  const { data: member } = await db().from("family_members").select("family_id").eq("user_id", data.user.id).maybeSingle();
+  if (member) {
+    const { data: fam } = await db().from("families").select("*").eq("id", member.family_id).single();
+    return Response.json({ family: fam });
+  }
 
   const isAdmin = config.adminEmails.includes((data.user.email ?? "").toLowerCase());
   const { data: family, error: insErr } = await db()

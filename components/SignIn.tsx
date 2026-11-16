@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { Logo } from "@/components/Logo";
 import { Cheko, Otto } from "@/components/Characters";
 
-export function SignIn() {
+export function SignIn({ redirectTo, note }: { redirectTo?: string; note?: string } = {}) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export function SignIn() {
     setError(null);
     const { error } = await supabase().auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: redirectTo ?? window.location.origin },
     });
     setBusy(false);
     if (error) setError(error.message);
@@ -29,7 +29,7 @@ export function SignIn() {
         <div className="bob"><Cheko size={64} /></div>
       </div>
       <Logo size={72} />
-      <p className="text-lg text-slate-600">What On Earth? Ask Otto and Cheko anything.</p>
+      <p className="text-lg text-slate-600">{note ?? "What On Earth? Ask Otto and Cheko anything."}</p>
       {sent ? (
         <div className="card w-full">
           <p className="text-lg">Check your email for a sign-in link. 📬</p>

@@ -3,6 +3,7 @@ import "@fontsource-variable/fredoka";
 import "@fontsource-variable/nunito";
 import "./globals.css";
 import { RegisterSW } from "@/components/RegisterSW";
+import { PlayerProvider } from "@/components/PlayerProvider";
 
 export const metadata: Metadata = {
   title: "WOE! What On Earth?",
@@ -23,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-AU">
       <body className="min-h-dvh antialiased">
-        {children}
+        <PlayerProvider>{children}</PlayerProvider>
         <RegisterSW />
       </body>
     </html>

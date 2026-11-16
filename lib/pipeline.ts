@@ -197,7 +197,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     });
     // The global dictionary grows with new words (unapproved); existing entries are never overwritten.
     const known = new Set((await pronunciationRules(null)).map((r) => r.word.toLowerCase()));
-    const fresh = [...words, ...script.new_words.map((n) => ({ word: n.word, alias: n.say_as }))].filter(
+    const fresh = words.filter(
       (w, i, all) => w.word && !known.has(w.word.toLowerCase()) && all.findIndex((x) => x.word.toLowerCase() === w.word.toLowerCase()) === i,
     );
     if (fresh.length) {
@@ -207,6 +207,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
 
     // 5. Voice + art, in parallel
     await setStage(episodeId, "recording");
+    if (!script.segments.some((sg) => sg.audio_path)) script.segments = splitTransforms(script.segments);
     const segments = script.segments;
     const rev = Date.now().toString(36);
     const voice = inBatches(segments, 2, async (seg, i) => {
@@ -299,6 +300,23 @@ export async function produceEpisode(episodeId: string): Promise<void> {
   }
 }
 
+/** Ends a segment on Cheko's "CHANGE-O!" so the transformation sound lands right after it. */
+export function splitTransforms(segments: Script["segments"]): Script["segments"] {
+  const out: Script["segments"] = [];
+  for (const seg of segments) {
+    const i = seg.lines.findIndex((l) => l.speaker === "cheko" && /change-?o/i.test(l.text));
+    if (i < 0) {
+      out.push(seg);
+      continue;
+    }
+    const head = { ...seg, lines: seg.lines.slice(0, i + 1), transform_after: true, pause_after_s: 0, sfx: seg.sfx === "poof" ? null : seg.sfx };
+    out.push(head);
+    if (i < seg.lines.length - 1) out.push({ ...seg, lines: seg.lines.slice(i + 1), fx: null, fx_path: undefined, sfx: null, beat: seg.beat });
+    else head.pause_after_s = seg.pause_after_s;
+  }
+  return out;
+}
+
 const KIT: Record<string, { prompt: string; seconds: number; music?: boolean }> = {
   theme: {
     prompt:
@@ -307,6 +325,11 @@ const KIT: Record<string, { prompt: string; seconds: number; music?: boolean }> 
     seconds: 12,
     music: true,
   },
+  transform: {
+    prompt: "Magical cartoon transformation: a quick rising sparkly swirl and spin, little twinkles, ending in a bright bubbly pop",
+    seconds: 2,
+  },
+  whoosh: { prompt: "Quick light playful whoosh transition for a kids' cartoon, airy and soft", seconds: 1 },
   jingle: { prompt: "Short cheerful kids' show sting, ukulele and glockenspiel, bright and warm, ends on a happy note", seconds: 3 },
   ding: { prompt: "Soft friendly correct-answer chime, single bright ding", seconds: 1 },
   boing: { prompt: "Silly cartoon boing spring sound, gentle and funny", seconds: 1 },

@@ -1,14 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
 import { useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { CATEGORIES, type Activity, type ClaimCheck } from "@/lib/types";
-import { Engine, type EngineState } from "@/lib/audio/engine";
+import { usePlayer, type Cue } from "@/components/PlayerProvider";
 
-type Item = { url: string; pause_after_s: number; caption: string; kind: string; fx_url?: string };
 type PlayData = {
   episode: {
     id: string;
@@ -22,9 +21,7 @@ type PlayData = {
     grownup_fact: string | null;
     activities: Activity[];
   };
-  items: Item[];
-  sfx: Record<string, string>;
-  ambience_url: string | null;
+  audio: { url: string; duration: number; cues: Cue[] };
   sources: { id: string; fact: string; url: string; title?: string }[];
   checks: ClaimCheck[];
 };
@@ -43,13 +40,11 @@ function Player() {
   const { session } = useSession();
   const [data, setData] = useState<PlayData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [idx, setIdx] = useState(0);
-  const [mode, setMode] = useState<EngineState>("idle");
   const [showWords, setShowWords] = useState(false);
   const [grownUp, setGrownUp] = useState(false);
   const [fav, setFav] = useState(false);
   const [activity, setActivity] = useState<number | null>(null);
-  const engine = useRef<Engine | null>(null);
+  const player = usePlayer();
 
   useEffect(() => {
     if (!session) return;
@@ -64,28 +59,30 @@ function Player() {
       .then(({ data }) => setFav(Boolean(data?.favourite)));
   }, [session, id, kid]);
 
+  const { load } = player;
   useEffect(() => {
     if (!data) return;
-    const e = new Engine(data.items, data.sfx, data.ambience_url, (state, i) => {
-      setMode(state);
-      setIdx(i);
-    });
-    engine.current = e;
-    return () => e.destroy();
-  }, [data]);
+    load({ id, kid, title: data.episode.title, art: data.episode.art_url, url: data.audio.url, duration: data.audio.duration, cues: data.audio.cues });
+  }, [data, id, kid, load]);
+
+  const mine = player.track?.id === id && player.track?.kid === kid;
+  const time = mine ? player.time : 0;
+  const cues = data?.audio.cues ?? [];
+  const think = cues.find((c) => c.think && time >= c.start && time < c.end);
+  const spoken = cues.filter((c) => !c.think);
+  const curIdx = Math.max(0, spoken.findLastIndex((c) => c.start <= time + 0.05));
+  const current = spoken[curIdx];
+  const duration = data?.audio.duration ?? 0;
+  const done = mine && !player.playing && time >= duration - 1;
+  const playing = mine && player.playing;
 
   function toggle() {
-    const e = engine.current;
-    if (!e) return;
-    if (mode === "idle") return void e.start(idx);
-    if (mode === "done") return void e.start(0);
-    if (mode === "thinking") return e.skipPause();
-    if (mode === "paused") return void e.resume();
-    void e.pause();
+    if (playing) player.pause();
+    else player.play();
   }
-
   function jump(delta: number) {
-    engine.current?.jump(idx + delta);
+    const target = spoken[Math.max(0, Math.min(spoken.length - 1, curIdx + delta))];
+    if (target) player.seek(delta < 0 && time - (current?.start ?? 0) > 2 ? current.start : target.start);
   }
 
   async function toggleFav() {
@@ -105,8 +102,6 @@ function Player() {
   }
   if (!data) return null;
   const cat = CATEGORIES.find((c) => c.id === data.episode.category);
-  const current = data.items[idx];
-  const playing = mode === "playing" || mode === "thinking";
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-5 p-6" style={{ background: `linear-gradient(${cat?.colour ?? "#38bdf8"}33, transparent 50%)` }}>
@@ -133,22 +128,37 @@ function Player() {
       <div className="flex items-center justify-center gap-5">
         <button className="btn-soft h-16 w-16 rounded-full text-2xl" onClick={() => jump(-1)} aria-label="Back a bit">⏮</button>
         <button className="btn-primary h-24 w-24 rounded-full text-4xl" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
-          {mode === "playing" ? "⏸" : "▶"}
+          {playing ? "⏸" : "▶"}
         </button>
         <button className="btn-soft h-16 w-16 rounded-full text-2xl" onClick={() => jump(1)} aria-label="Skip ahead">⏭</button>
       </div>
 
-      <div className="flex justify-center gap-1.5" aria-hidden>
-        {data.items.map((_, i) => (
-          <span key={i} className={`h-2.5 rounded-full transition-all ${i === idx ? "w-6 bg-sun" : i < idx ? "w-2.5 bg-sun/50" : "w-2.5 bg-slate-200"}`} />
-        ))}
+      <div className="space-y-1">
+        <input
+          type="range"
+          min={0}
+          max={Math.max(1, Math.floor(duration))}
+          step={1}
+          value={Math.floor(time)}
+          onChange={(e) => player.seek(Number(e.target.value))}
+          className="w-full accent-[var(--color-sun)]"
+          aria-label="Where you are in the episode"
+        />
+        <div className="flex justify-between text-sm font-semibold text-slate-500">
+          <span>{clock(time)}</span>
+          <span>{clock(duration)}</span>
+        </div>
       </div>
 
-      {mode === "thinking" && <p className="text-center font-display text-2xl">🤔 What do you think?</p>}
-      {mode === "done" && <p className="text-center font-display text-2xl">Stay curious! 🌏</p>}
+      {think && (
+        <button className="text-center font-display text-2xl" onClick={() => player.seek(think.end)}>
+          🤔 What do you think? <span className="text-base text-slate-500 underline">skip</span>
+        </button>
+      )}
+      {done && <p className="text-center font-display text-2xl">Stay curious! 🌏</p>}
 
       {data.episode.activities.length > 0 && (
-        <section className={`card space-y-3 ${mode === "done" ? "ring-4 ring-sun" : ""}`}>
+        <section className={`card space-y-3 ${done ? "ring-4 ring-sun" : ""}`}>
           <h2 className="text-center text-2xl font-bold">Let&apos;s do something!</h2>
           <div className="grid grid-cols-3 gap-2">
             {data.episode.activities.map((a, i) => (
@@ -226,6 +236,11 @@ function Player() {
       )}
     </main>
   );
+}
+
+function clock(s: number) {
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
 const ACTIVITY_ICON: Record<string, string> = { make: "✂️", move: "🏃", explore: "🔍", draw: "🖍️" };

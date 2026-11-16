@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
 import { useFamily, useSession } from "@/lib/hooks";
 import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
+import { ShareFamily } from "@/components/ShareFamily";
 
 type Ask = { id: string; text: string; status: string; triage_reason: string | null; created_at: string; kid_id: string | null; created_new: boolean; episode_id: string | null };
 
@@ -89,6 +90,16 @@ export default function GrownUps() {
           </div>
         ))}
       </section>
+
+      <ShareFamily />
+
+      <Link href="/grownups/words" className="card flex items-center justify-between">
+        <span>
+          <span className="block text-xl font-semibold">How Otto says it</span>
+          <span className="text-slate-600">Check and fix tricky words</span>
+        </span>
+        <span className="text-2xl">🔊</span>
+      </Link>
 
       <section className="card space-y-2">
         <h2 className="text-xl font-semibold">This month</h2>

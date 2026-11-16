@@ -12,8 +12,10 @@ function voiceFor(s: Speaker) {
 export function applyAliases(text: string, rules: { word: string; alias: string }[]): string {
   let out = text;
   for (const r of rules) {
+    // Capitals make the voice spell words out ("OWT" -> "O-U-T"), so respellings are kept lower case.
+    const alias = r.alias.replace(/[A-Z]{2,}/g, (m) => m.toLowerCase());
     const esc = r.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    out = out.replace(new RegExp(`\\b${esc}\\b`, "gi"), r.alias);
+    out = out.replace(new RegExp(`\\b${esc}\\b`, "gi"), alias);
   }
   return out;
 }

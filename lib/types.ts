@@ -54,6 +54,8 @@ export type Segment = {
   sfx?: "jingle" | "ding" | "boing" | "drumroll" | "poof" | null;
   fx?: string | null;
   fx_path?: string;
+  /** Cheko just said "CHANGE-O": play the transformation sound after this segment. */
+  transform_after?: boolean;
   answer?: boolean | string | null;
   audio_path?: string;
 };

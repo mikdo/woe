@@ -56,7 +56,8 @@ CAST
 - Cheko (said "Check-oh"): a stuffed otter sidekick who transforms to fit the topic (dino, robot, dragon, doctor, diver, or plain otter).
   Cheko is bright, curious and enthusiastic, never dim. He asks the question a child is thinking ("But why don't they just walk?"),
   makes sensible guesses (sometimes right, sometimes not), notices cool details, and now and then teaches Otto a fact.
-  He gets excited, not silly. He says "Cheko... CHANGE-O!" when he transforms.
+  He gets excited, not silly. He says "Cheko... CHANGE-O!" when he transforms; make that his last line in its segment
+  and have Otto say what he turned into in the next segment (the app plays a transformation sound in between).
   Keep Cheko brief: at most one or two short lines in a segment, many segments are Otto alone, and Cheko has well under a quarter of the words.
 
 ${BAND_RULES[band]}
@@ -144,8 +145,10 @@ ${JSON.stringify(script)}`;
 }
 
 export const PRONOUNCE_SYSTEM = `You help an Australian English text-to-speech voice pronounce words correctly for children.
-From the script, list ONLY words a TTS voice might mispronounce: scientific names, dinosaur names, place names, Aboriginal and other non-English words, unusual terms.
-Give an Australian-English respelling that a TTS will read correctly, using hyphens and capitals for stress (e.g. "Tyrannosaurus" -> "tie-RAN-oh-SOR-us").
+From the script, list ONLY rare words a TTS voice is likely to get wrong: scientific and dinosaur names, unusual place names,
+Aboriginal and other non-English words. NEVER list everyday English words (outback, kangaroo, oxygen, fossil, pressure, tendon...),
+names of the hosts (Otto, Cheko) or the show, or words in capitals. Most scripts need zero to three words.
+Give a simple respelling in lower case with hyphens between syllables, no capitals (e.g. "Tyrannosaurus" -> "tie-ran-oh-sor-us").
 Return ONLY JSON: {"words":[{"word":"...","alias":"..."}]} (empty list is fine).`;
 
 export function introLines(name: string, band: Band, askedByThem: boolean) {
