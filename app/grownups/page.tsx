@@ -126,6 +126,34 @@ export default function GrownUps() {
       {family.is_admin && (
         <section className="card space-y-3">
           <h2 className="text-xl font-semibold">Admin</h2>
+          <p className="text-sm text-slate-500">Voice test: hear Otto and Cheko before the first episode.</p>
+          <div className="flex flex-wrap gap-2">
+            {["Hello and hook", "Explainer and new word", "Game and goodbye"].map((label, i) => (
+              <button
+                key={label}
+                className="btn-soft py-2 text-base"
+                onClick={async () => {
+                  setMsg(`Making "${label}"…`);
+                  try {
+                    const { data } = await supabase().auth.getSession();
+                    const res = await fetch("/api/admin/voice-test", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token}` },
+                      body: JSON.stringify({ sample: i }),
+                    });
+                    if (!res.ok) throw new Error((await res.json()).error ?? "Voice failed");
+                    const audio = new Audio(URL.createObjectURL(await res.blob()));
+                    setMsg(`Playing "${label}"`);
+                    await audio.play();
+                  } catch (e) {
+                    setMsg((e as Error).message);
+                  }
+                }}
+              >
+                ▶︎ {label}
+              </button>
+            ))}
+          </div>
           <button
             className="btn-soft"
             onClick={async () => {
