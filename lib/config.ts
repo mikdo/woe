@@ -11,7 +11,7 @@ export const config = {
   claudeWebSearchTool: process.env.CLAUDE_WEB_SEARCH_TOOL ?? "web_search_20260318",
 
   geminiKey: process.env.GEMINI_API_KEY ?? "",
-  geminiCheckModel: process.env.GEMINI_CHECK_MODEL ?? "gemini-flash-latest",
+  geminiCheckModel: process.env.GEMINI_CHECK_MODEL ?? "gemini-3.8-flash",
   geminiImageModel: process.env.GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-image",
   geminiEmbedModel: process.env.GEMINI_EMBED_MODEL ?? "gemini-embedding-001",
 
