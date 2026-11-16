@@ -105,6 +105,9 @@ export async function produceEpisode(episodeId: string): Promise<void> {
   const { data: ep } = await db().from("episodes").select("*").eq("id", episodeId).single();
   if (!ep || ep.status === "ready") return;
   const band = ep.band as Band;
+  const started = Date.now();
+  // Functions stop at 5 minutes: past ~3, hand the rest to a fresh run.
+  const outOfTime = () => Date.now() - started > 170_000;
 
   try {
     // 1. Research
@@ -121,6 +124,8 @@ export async function produceEpisode(episodeId: string): Promise<void> {
       await db().from("episodes").update({ facts: { facts, checks: [] } }).eq("id", episodeId);
     }
 
+    if (outOfTime()) return continueLater(episodeId);
+
     // 2. Script + 3. Fact check with up to 2 fixes
     let script = ep.script as Script | null;
     let checks: ClaimCheck[] = (ep.facts?.checks as ClaimCheck[] | undefined) ?? [];
@@ -128,8 +133,14 @@ export async function produceEpisode(episodeId: string): Promise<void> {
       if (!script) {
         await setStage(episodeId, "writing");
         script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+        await db().from("episodes").update({ script }).eq("id", episodeId);
+        if (outOfTime()) return continueLater(episodeId);
       }
       for (let loop = 0; loop <= config.maxFixLoops; loop++) {
+        if (loop > 0 && outOfTime()) {
+          await db().from("episodes").update({ script }).eq("id", episodeId);
+          return continueLater(episodeId);
+        }
         await setStage(episodeId, loop === 0 ? "checking" : "fixing", { script });
         const { claims } = await claudeJson<{ claims: string[] }>({
           model: config.claudeFast,
@@ -173,6 +184,8 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     }
     if (!script) throw new Error("Script missing");
 
+    if (outOfTime()) return continueLater(episodeId);
+
     // 4. Pronunciation
     await setStage(episodeId, "pronouncing");
     const { words } = await claudeJson<{ words: { word: string; alias: string }[] }>({
@@ -196,7 +209,7 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     await setStage(episodeId, "recording");
     const segments = script.segments;
     const voice = inBatches(segments, 4, async (seg, i) => {
-      if (seg.audio_path) return;
+      if (seg.audio_path || outOfTime()) return;
       const lines = seg.lines.map((l) => ({ speaker: l.speaker, text: applyAliases(l.text, rules) }));
       const bytes = await speak(lines);
       const path = `episodes/${episodeId}/seg-${String(i).padStart(2, "0")}.mp3`;
@@ -211,6 +224,11 @@ export async function produceEpisode(episodeId: string): Promise<void> {
           return path;
         });
     const [, artPath] = await Promise.all([voice, art.catch(() => null)]);
+    if (segments.some((sg) => !sg.audio_path)) {
+      // Save the recorded segments and carry on in a fresh run.
+      await db().from("episodes").update({ script: { ...script, segments }, art_path: artPath }).eq("id", episodeId);
+      return continueLater(episodeId);
+    }
 
     // 6. Done
     const { data: fam } = await db().from("families").select("is_admin").eq("id", ep.created_by_family).maybeSingle();
@@ -235,6 +253,18 @@ export async function produceEpisode(episodeId: string): Promise<void> {
     await setStage(episodeId, "error", { error: message.slice(0, 500) });
     throw e;
   }
+}
+
+/** Starts a fresh function run to continue an episode (server-to-server, authorised by the service key). */
+async function continueLater(episodeId: string) {
+  await setStage(episodeId, "continuing");
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  if (!host) return;
+  await fetch(`https://${host}/api/internal/continue`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-internal-key": config.supabaseServiceKey },
+    body: JSON.stringify({ episodeId }),
+  }).catch((e) => console.error("continueLater failed", episodeId, e));
 }
 
 /** Links an ask to its (ready) episode: library row + personal clips for the asking kid. */

@@ -6,18 +6,18 @@ import type { ClaimCheck } from "@/lib/types";
 
 let client: GoogleGenAI | null = null;
 
-const FALLBACK_CHECK_MODELS = ["gemini-3.6-flash", "gemini-3-flash-preview"];
+const FALLBACK_CHECK_MODELS = ["gemini-3.6-flash"];
 
 function retryable(e: unknown) {
   const m = e instanceof Error ? e.message : String(e);
-  return /\b(429|500|502|503|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|timeout/i.test(m);
+  return /\b(429|500|502|503|504)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|timeout|timed out|aborted/i.test(m);
 }
 
 /** Retries busy/overloaded errors with backoff, then tries fallback models. */
 async function withRetry<T>(models: string[], fn: (model: string) => Promise<T>): Promise<T> {
   let last: unknown;
   for (const model of models) {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         return await fn(model);
       } catch (e) {
@@ -30,7 +30,7 @@ async function withRetry<T>(models: string[], fn: (model: string) => Promise<T>)
   throw last;
 }
 function gemini() {
-  if (!client) client = new GoogleGenAI({ apiKey: config.geminiKey });
+  if (!client) client = new GoogleGenAI({ apiKey: config.geminiKey, httpOptions: { timeout: 60_000 } });
   return client;
 }
 
