@@ -6,7 +6,6 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/episodes/*/play": ["./node_modules/ffmpeg-static/ffmpeg"],
     "/api/admin/*": ["./node_modules/ffmpeg-static/ffmpeg"],
-    "/api/admin/style-test": ["./node_modules/ffmpeg-static/ffmpeg"],
     "/api/internal/*": ["./node_modules/ffmpeg-static/ffmpeg"],
   },
   turbopack: {
