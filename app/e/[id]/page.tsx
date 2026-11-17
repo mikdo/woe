@@ -7,7 +7,7 @@ import { useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { CATEGORIES, type Activity, type ClaimCheck } from "@/lib/types";
 import { usePlayer, type Cue } from "@/components/PlayerProvider";
-import { ArrowLeft, MagnifyingGlass, Pause, Play, SkipBack, SkipForward, Star } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowCounterClockwise, ArrowLeft, CheckCircle, Circle, MagnifyingGlass, Pause, Play, Stop, Star } from "@phosphor-icons/react";
 
 type PlayData = {
   episode: {
@@ -47,6 +47,7 @@ function Player() {
   const [showWords, setShowWords] = useState(false);
   const [grownUp, setGrownUp] = useState(false);
   const [fav, setFav] = useState(false);
+  const [heardSaved, setHeard] = useState(false);
   const [activity, setActivity] = useState<number | null>(null);
   const player = usePlayer();
   const [peek, setPeek] = useState(false);
@@ -63,6 +64,13 @@ function Player() {
       .eq("episode_id", id)
       .maybeSingle()
       .then(({ data }) => setFav(Boolean(data?.favourite)));
+    supabase()
+      .from("listens")
+      .select("heard")
+      .eq("episode_id", id)
+      .eq("heard", true)
+      .limit(1)
+      .then(({ data }) => setHeard(Boolean(data?.length)));
   }, [session, id, kid]);
 
   const { load } = player;
@@ -80,15 +88,32 @@ function Player() {
   const current = spoken[curIdx];
   const duration = data?.audio.duration ?? 0;
   const done = mine && !player.playing && time >= duration - 1;
+  // Playing past 80% (or to the end) marks it heard automatically, like the sync does.
+  const heard = heardSaved || done || (mine && duration > 0 && time / duration >= 0.8);
   const playing = mine && player.playing;
 
   function toggle() {
     if (playing) player.pause();
     else player.play();
   }
-  function jump(delta: number) {
-    const target = spoken[Math.max(0, Math.min(spoken.length - 1, curIdx + delta))];
-    if (target) player.seek(delta < 0 && time - (current?.start ?? 0) > 2 ? current.start : target.start);
+  function skip(seconds: number) {
+    if (mine) player.seek(time + seconds);
+  }
+
+  async function toggleHeard() {
+    const next = !heard;
+    setHeard(next);
+    if (next) {
+      await supabase()
+        .from("listens")
+        .upsert(
+          { episode_id: id, listener: kid ?? "library", heard: true, duration: Math.floor(duration), updated_at: new Date().toISOString() },
+          { onConflict: "family_id,episode_id,listener" },
+        );
+    } else {
+      // Not heard for anyone in the family, so it shows up as new again.
+      await supabase().from("listens").update({ heard: false }).eq("episode_id", id);
+    }
   }
 
   async function toggleFav() {
@@ -180,17 +205,25 @@ function Player() {
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-8">
-          <button className="press text-ink" onClick={() => jump(-1)} aria-label="Back a bit">
-            <SkipBack size={32} weight="fill" />
+        <div className="flex items-center justify-center gap-6">
+          <button className="press grid h-11 w-11 place-items-center text-slate-400" onClick={player.stop} disabled={!mine} aria-label="Stop">
+            <Stop size={26} weight="fill" />
           </button>
+          <SkipButton seconds={-15} onClick={() => skip(-15)} />
           <button className="press grid h-[72px] w-[72px] place-items-center rounded-full bg-ember text-white shadow-[0_5px_0_#b5541f] active:shadow-[0_2px_0_#b5541f]" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
             {playing ? <Pause size={34} weight="fill" /> : <Play size={34} weight="fill" className="translate-x-0.5" />}
           </button>
-          <button className="press text-ink" onClick={() => jump(1)} aria-label="Skip ahead">
-            <SkipForward size={32} weight="fill" />
-          </button>
+          <SkipButton seconds={15} onClick={() => skip(15)} />
+          <span className="h-11 w-11" aria-hidden />
         </div>
+
+        <button
+          onClick={toggleHeard}
+          className={`press flex items-center gap-1.5 self-center rounded-full px-3 py-1 text-sm font-bold ${heard ? "bg-green-50 text-leaf" : "text-slate-500"}`}
+        >
+          {heard ? <CheckCircle size={18} weight="fill" /> : <Circle size={18} weight="bold" />}
+          {heard ? "Heard" : "Mark as heard"}
+        </button>
 
       {think && (
         <button className="text-center font-display text-2xl" onClick={() => player.seek(think.end)}>
@@ -310,6 +343,16 @@ function Player() {
       )}
       </section>
     </main>
+  );
+}
+
+function SkipButton({ seconds, onClick }: { seconds: number; onClick: () => void }) {
+  const Icon = seconds < 0 ? ArrowCounterClockwise : ArrowClockwise;
+  return (
+    <button className="press relative grid h-12 w-12 place-items-center text-ink" onClick={onClick} aria-label={seconds < 0 ? "Back 15 seconds" : "Forward 15 seconds"}>
+      <Icon size={44} weight="bold" />
+      <span className="absolute inset-0 grid place-items-center pt-0.5 text-[11px] font-black tabular-nums">{Math.abs(seconds)}</span>
+    </button>
   );
 }
 

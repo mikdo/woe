@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Pause, Play } from "@phosphor-icons/react";
+import { Pause, Play, X } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase/browser";
 
 export type Cue = { start: number; end: number; caption: string; kind: string; think?: boolean };
@@ -16,6 +16,10 @@ type Player = {
   play: () => void;
   pause: () => void;
   seek: (s: number) => void;
+  /** Pause and go back to the start. */
+  stop: () => void;
+  /** Stop and put the episode away (hides the mini player). */
+  close: () => void;
 };
 
 const Ctx = createContext<Player | null>(null);
@@ -90,6 +94,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setTime(a.currentTime);
   }, []);
 
+  const stop = useCallback(() => {
+    const a = audio.current;
+    if (!a) return;
+    a.pause();
+    a.currentTime = 0;
+    setTime(0);
+    lastSave.current = 0;
+    setTrack((t) => {
+      if (t) {
+        try {
+          localStorage.removeItem(posKey(t));
+        } catch {}
+        syncListen(t, 0, false, true);
+      }
+      return t;
+    });
+  }, []);
+  const close = useCallback(() => {
+    stop();
+    const a = audio.current;
+    setTrack(null);
+    if (a) {
+      a.removeAttribute("src");
+      a.load();
+    }
+  }, [stop]);
+
   // Lock screen / headphone controls.
   useEffect(() => {
     if (!track || !("mediaSession" in navigator)) return;
@@ -102,12 +133,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const ms = navigator.mediaSession;
     ms.setActionHandler("play", play);
     ms.setActionHandler("pause", pause);
-    ms.setActionHandler("seekbackward", () => seek((audio.current?.currentTime ?? 0) - 10));
-    ms.setActionHandler("seekforward", () => seek((audio.current?.currentTime ?? 0) + 10));
+    ms.setActionHandler("seekbackward", (d) => seek((audio.current?.currentTime ?? 0) - (d.seekOffset ?? 15)));
+    ms.setActionHandler("seekforward", (d) => seek((audio.current?.currentTime ?? 0) + (d.seekOffset ?? 15)));
+    try {
+      ms.setActionHandler("stop", stop);
+    } catch {}
     try {
       ms.setActionHandler("seekto", (d) => d.seekTime != null && seek(d.seekTime));
     } catch {}
-  }, [track, play, pause, seek]);
+  }, [track, play, pause, seek, stop]);
 
   function onTime() {
     const a = audio.current;
@@ -131,7 +165,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Ctx.Provider value={{ track, playing, time, load, play, pause, seek }}>
+    <Ctx.Provider value={{ track, playing, time, load, play, pause, seek, stop, close }}>
       {children}
       <MiniPlayer />
       <audio
@@ -193,6 +227,9 @@ function MiniPlayer() {
           aria-label={p.playing ? "Pause" : "Play"}
         >
           {p.playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" className="translate-x-px" />}
+        </button>
+        <button className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400" onClick={p.close} aria-label="Stop">
+          <X size={18} weight="bold" />
         </button>
       </div>
       <div className="absolute inset-x-3 bottom-0 h-[3px] overflow-hidden rounded-full bg-orange-100">
