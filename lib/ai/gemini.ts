@@ -138,7 +138,11 @@ export async function makeArt(prompt: string, styleRefs: { mimeType: string; dat
     config: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: "1:1" } },
   }));
   const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-  if (!part?.inlineData?.data) throw new Error("No image returned");
+  if (!part?.inlineData?.data) {
+    const c = res.candidates?.[0];
+    const said = c?.content?.parts?.map((p) => p.text).filter(Boolean).join(" ").slice(0, 300);
+    throw new Error(`No image returned (${c?.finishReason ?? res.promptFeedback?.blockReason ?? "unknown"}${said ? `: ${said}` : ""})`);
+  }
   addImage(config.geminiImageModel);
   return Buffer.from(part.inlineData.data, "base64");
 }

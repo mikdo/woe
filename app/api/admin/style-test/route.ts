@@ -43,7 +43,12 @@ export async function GET(req: Request) {
   const scene = SCENES[url.searchParams.get("scene") ?? ""];
   if (!scene) return Response.json({ error: "No scene" }, { status: 400 });
   const ref = Buffer.from(await (await fetch(new URL("/art/style-ref.jpg", url.origin))).arrayBuffer()).toString("base64");
-  const png = await makeArt(scene, [{ mimeType: "image/jpeg", data: ref }], STYLE);
+  let png: Buffer;
+  try {
+    png = await makeArt(scene, [{ mimeType: "image/jpeg", data: ref }], STYLE);
+  } catch (e) {
+    return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 });
+  }
   const path = `style-tests/${url.searchParams.get("scene")}-${Date.now()}.png`;
   await db().storage.from("shared").upload(path, png, { contentType: "image/png", upsert: true });
   const small = await preview(png);
