@@ -117,8 +117,8 @@ export async function researchFacts(system: string, question: string, band: stri
 }
 
 /** Square picture-book cover art. Returns PNG bytes. */
-export async function makeArt(prompt: string, styleRefs: { mimeType: string; data: string }[] = []): Promise<Buffer> {
-  const style =
+export async function makeArt(prompt: string, styleRefs: { mimeType: string; data: string }[] = [], styleOverride?: string): Promise<Buffer> {
+  const style = styleOverride ??
     "Friendly picture-book illustration for toddlers, soft hand-drawn texture, warm bright colours, simple shapes, " +
     "lots of space, no text, no letters, no real people, no logos or brand characters. " +
     "Find-Cheko game: hide Cheko somewhere in the scene, small but findable by a 4 year old (peeking from behind something, " +
