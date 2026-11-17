@@ -6,7 +6,7 @@ import { useFamily, useSession } from "@/lib/hooks";
 import { BANDS, CATEGORIES } from "@/lib/types";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
 import { InTheWorks } from "@/components/InTheWorks";
-import { PillSelect } from "@/components/SkyPage";
+import { Art, PillSelect } from "@/components/SkyPage";
 
 const FIELDS = "id, title, question, category, art_path, cheko_form, status, band";
 type Heard = "any" | "new" | "heard";
@@ -141,7 +141,7 @@ export default function Library() {
         </div>
       ) : shown.length === 0 ? (
         <div className="pop-in flex flex-col items-center gap-3 py-16 text-center text-slate-500">
-          <span className="text-5xl">🔭</span>
+          <Art name="library-empty" className="max-h-40 object-contain" fallback={<span className="text-5xl">🔭</span>} />
           <p className="text-lg">{filtered ? "Nothing matches those filters." : tab === "ours" ? "No adventures yet. Ask Otto a question!" : "Nothing here yet."}</p>
           {filtered && (
             <button className="btn-soft py-2 text-sm" onClick={clear}>

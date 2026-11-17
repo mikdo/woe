@@ -1,5 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
+import { artSrc } from "@/lib/art";
 
 /**
  * The WOE! page shape: a sky header (illustration or big title) with a cream sheet over it.
@@ -44,7 +45,7 @@ export function SkyPage({
 }
 
 /**
- * One of Mikey's drawings from /public/art (e.g. /art/home.webp).
+ * One of Mikey's drawings from /public/art (e.g. /art/home.webp). The slots are listed in lib/art.ts.
  * Until the drawing exists, the fallback shows instead.
  */
 export function Art({ name, alt = "", className = "", fallback }: { name: string; alt?: string; className?: string; fallback: ReactNode }) {
@@ -52,7 +53,7 @@ export function Art({ name, alt = "", className = "", fallback }: { name: string
   if (missing) return <>{fallback}</>;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={`/art/${name}.webp`} alt={alt} className={className} onError={() => setMissing(true)} />
+    <img src={artSrc(name)} alt={alt} className={className} onError={() => setMissing(true)} />
   );
 }
 

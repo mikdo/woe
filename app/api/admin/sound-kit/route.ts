@@ -1,5 +1,7 @@
 import { requireFamily } from "@/lib/supabase/admin";
 import { ensureKit } from "@/lib/pipeline";
+import { isOutOfCredits } from "@/lib/ai/eleven";
+import { VOICE_CREDITS_MESSAGE } from "@/lib/stages";
 
 export const maxDuration = 300;
 
@@ -11,6 +13,7 @@ export async function POST(req: Request) {
   try {
     return Response.json({ made: await ensureKit(true) });
   } catch (e) {
+    if (isOutOfCredits(e)) return Response.json({ error: VOICE_CREDITS_MESSAGE, code: "no_credits" }, { status: 402 });
     return Response.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
   }
 }

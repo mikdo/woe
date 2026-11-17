@@ -4,7 +4,8 @@ import { db, type Family } from "@/lib/supabase/admin";
 import { claudeJson } from "@/lib/ai/claude";
 import { checkClaims, coverArt, embed, researchFacts } from "@/lib/ai/gemini";
 import { costStep, trackCosts } from "@/lib/ai/cost";
-import { applyAliases, music, soundEffect, speak } from "@/lib/ai/eleven";
+import { applyAliases, isOutOfCredits, music, soundEffect, speak } from "@/lib/ai/eleven";
+import { NO_CREDITS, VOICE_CREDITS_MESSAGE } from "@/lib/stages";
 import { CLAIMS_SCHEMA, FIX_SCHEMA, PRONOUNCE_SCHEMA, SAME_SCHEMA, SCRIPT_SCHEMA, TRIAGE_SCHEMA } from "@/lib/schemas";
 import {
   CLAIMS_SYSTEM,
@@ -347,7 +348,9 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
     for (const a of asks ?? []) await finishAsk(a.id, episodeId);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await setStage(episodeId, "error", { error: message.slice(0, 500) });
+    // Out of voice credits: park it (the checked script is saved) until a grown-up tops up and taps Try again.
+    if (isOutOfCredits(e)) await setStage(episodeId, NO_CREDITS, { error: VOICE_CREDITS_MESSAGE });
+    else await setStage(episodeId, "error", { error: message.slice(0, 500) });
     throw e;
   }
 }
@@ -458,11 +461,17 @@ export async function finishAsk(askId: string, episodeId: string) {
   await db()
     .from("family_library")
     .upsert({ family_id: ask.family_id, episode_id: episodeId, kid_id: ask.kid_id }, { onConflict: "family_id,episode_id" });
-  if (ask.for_all) {
-    await ensureGroupClips(ask.family_id, episodeId, ask.created_new);
-  } else if (ask.kid_id) {
-    const { data: kid } = await db().from("kids").select("*").eq("id", ask.kid_id).single();
-    if (kid) await ensurePersonalClips(kid as Kid, episodeId, ask.created_new);
+  try {
+    if (ask.for_all) {
+      await ensureGroupClips(ask.family_id, episodeId, ask.created_new);
+    } else if (ask.kid_id) {
+      const { data: kid } = await db().from("kids").select("*").eq("id", ask.kid_id).single();
+      if (kid) await ensurePersonalClips(kid as Kid, episodeId, ask.created_new);
+    }
+  } catch (e) {
+    // The episode itself is done. The hello/goodbye clips are made again when it's played.
+    if (!isOutOfCredits(e)) throw e;
+    console.error("personal clips skipped: out of voice credits", episodeId);
   }
   await db().from("asks").update({ status: "ready" }).eq("id", askId);
 }

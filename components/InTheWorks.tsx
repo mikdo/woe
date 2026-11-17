@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
-import { STAGES, stageProgress } from "@/lib/stages";
+import { NO_CREDITS, STAGES, stageProgress } from "@/lib/stages";
 
 type Row = {
   id: string;
@@ -54,7 +54,9 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
       if (kidId === "all") list = list.filter((r) => r.for_all);
       for (const r of list) {
         // A stalled or failed episode gets one automatic restart per visit.
-        const stalled = r.status === "generating" && r.episode_id && (r.episodes?.stage === "error" || isStale(r));
+        // Not when the voice credits ran out: that needs a top-up first, then a tap on Try again.
+        const parked = r.episodes?.stage === NO_CREDITS;
+        const stalled = r.status === "generating" && r.episode_id && !parked && (r.episodes?.stage === "error" || isStale(r));
         if (stalled && !retried.current.has(r.episode_id!)) {
           retried.current.add(r.episode_id!);
           api(`/api/episodes/${r.episode_id}/resume`, { method: "POST" }).catch(() => null);
@@ -78,17 +80,20 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
       {rows.map((r) => {
         const stage = r.episodes?.stage ?? "queued";
         const ready = r.status === "ready";
-        const failed = stage === "error" || stage === "needs_review" || isStale(r);
+        const noCredits = stage === NO_CREDITS;
+        const failed = noCredits || stage === "error" || stage === "needs_review" || isStale(r);
         const href = r.episode_id ? `/e/${r.episode_id}${r.for_all ? "?kid=all" : r.kid_id ? `?kid=${r.kid_id}` : ""}` : "#";
         const body = (
           <div className={`card flex items-center gap-3 p-3 ${ready ? "ring-4 ring-sun" : ""}`}>
-            <span className={`text-3xl ${ready ? "" : "bob"}`}>{ready ? "🎉" : failed ? "🧐" : "🛠️"}</span>
+            <span className={`text-3xl ${ready ? "" : "bob"}`}>{ready ? "🎉" : noCredits ? "🦦" : failed ? "🧐" : "🛠️"}</span>
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-lg font-semibold">{r.episodes?.title ?? r.text}</p>
               <p className="text-sm text-slate-600">
                 {ready
                   ? "Ready to play!"
-                  : stage === "needs_review"
+                  : noCredits
+                    ? "Cheko lost his voice: the voice credits ran out. Top up ElevenLabs, then try again."
+                    : stage === "needs_review"
                     ? "A grown-up needs to check a fact"
                     : failed
                       ? "Got stuck. Trying again…"

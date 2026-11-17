@@ -1,5 +1,5 @@
 import { requireFamily } from "@/lib/supabase/admin";
-import { speak } from "@/lib/ai/eleven";
+import { elevenErrorResponse, speak } from "@/lib/ai/eleven";
 
 export const maxDuration = 60;
 
@@ -14,6 +14,6 @@ export async function POST(req: Request) {
     const audio = await speak([{ speaker: "otto", text: `Hey hey, ${clean}! I'm Otto. Nice to meet you!` }]);
     return new Response(new Uint8Array(audio), { headers: { "Content-Type": "audio/mpeg" } });
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "Voice failed" }, { status: 502 });
+    return elevenErrorResponse(e, "Voice failed");
   }
 }

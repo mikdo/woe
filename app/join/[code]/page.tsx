@@ -6,6 +6,7 @@ import { api } from "@/lib/supabase/browser";
 import { useSession } from "@/lib/hooks";
 import { SignIn } from "@/components/SignIn";
 import { Cheko, Otto } from "@/components/Characters";
+import { SkyPage } from "@/components/SkyPage";
 
 export default function Join() {
   const { code } = useParams<{ code: string }>();
@@ -29,19 +30,32 @@ export default function Join() {
     return <SignIn redirectTo={typeof window !== "undefined" ? window.location.href : undefined} note="You've been invited to a WOE! family. Pop in your email to join." />;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-5 p-6 text-center">
-      <div className="flex items-end gap-2">
-        <Otto size={80} />
-        <div className="bob"><Cheko size={64} /></div>
+    <SkyPage
+      hero={
+        <div className="flex justify-center pb-2 pt-8">
+          <div className="flex items-end gap-2">
+            <Otto size={84} />
+            <div className="bob"><Cheko size={64} /></div>
+          </div>
+        </div>
+      }
+    >
+      <div className="pop-in flex flex-col items-center gap-4 py-4 text-center">
+        {joined && (
+          <>
+            <h1 className="celebrate text-2xl font-bold">Welcome to {joined}! 🎉</h1>
+            <p className="text-slate-600">Taking you to the kids…</p>
+          </>
+        )}
+        {error && (
+          <>
+            <h1 className="text-2xl font-bold">That invite didn&apos;t work</h1>
+            <p className="text-slate-600">{error}</p>
+            <Link className="btn-soft" href="/">Home</Link>
+          </>
+        )}
+        {!joined && !error && <h1 className="text-2xl font-bold">Joining…</h1>}
       </div>
-      {joined && <p className="text-2xl font-bold">Welcome to {joined}! 🎉</p>}
-      {error && (
-        <>
-          <p className="text-lg">{error}</p>
-          <Link className="btn-soft" href="/">Home</Link>
-        </>
-      )}
-      {!joined && !error && <p className="text-lg">Joining…</p>}
-    </main>
+    </SkyPage>
   );
 }

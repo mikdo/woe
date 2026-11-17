@@ -2,8 +2,33 @@ import "server-only";
 import { config } from "@/lib/config";
 import { addElevenChars } from "@/lib/ai/cost";
 import type { Speaker } from "@/lib/types";
+import { VOICE_CREDITS_MESSAGE } from "@/lib/stages";
 
 const BASE = "https://api.elevenlabs.io/v1";
+
+/** Thrown when the ElevenLabs plan has no voice credits left. Retrying won't help until it's topped up. */
+export class OutOfVoiceCredits extends Error {
+  constructor() {
+    super(VOICE_CREDITS_MESSAGE);
+    this.name = "OutOfVoiceCredits";
+  }
+}
+
+export function isOutOfCredits(e: unknown): boolean {
+  return e instanceof Error && (e.name === "OutOfVoiceCredits" || /quota_exceeded|exceeds your quota|insufficient[_ ]credits/i.test(e.message));
+}
+
+/** A clear JSON error for routes: 402 when the credits ran out, otherwise 502 with the detail. */
+export function elevenErrorResponse(e: unknown, fallback: string) {
+  if (isOutOfCredits(e)) return Response.json({ error: VOICE_CREDITS_MESSAGE, code: "no_credits" }, { status: 402 });
+  return Response.json({ error: e instanceof Error ? e.message : fallback }, { status: 502 });
+}
+
+async function fail(what: string, res: Response): Promise<never> {
+  const body = await res.text();
+  if (res.status === 402 || /quota_exceeded|exceeds your quota|insufficient[_ ]credits/i.test(body)) throw new OutOfVoiceCredits();
+  throw new Error(`ElevenLabs ${what} failed: ${res.status} ${body}`);
+}
 
 function voiceFor(s: Speaker) {
   return s === "cheko" ? config.chekoVoiceId : config.ottoVoiceId;
@@ -44,7 +69,7 @@ async function speakOnce(lines: { speaker: Speaker; text: string }[]): Promise<B
       inputs: lines.map((l) => ({ text: l.text, voice_id: voiceFor(l.speaker) })),
     }),
   });
-  if (!res.ok) throw new Error(`ElevenLabs speech failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) await fail("speech", res);
   return Buffer.from(await res.arrayBuffer());
 }
 
@@ -67,7 +92,7 @@ export async function soundEffect(text: string, seconds: number, loop = false): 
       headers: { "xi-api-key": config.elevenKey, "Content-Type": "application/json" },
       body: JSON.stringify({ text, duration_seconds: seconds, prompt_influence: 0.6, loop }),
     });
-    if (!res.ok) throw new Error(`ElevenLabs sound failed: ${res.status} ${await res.text()}`);
+    if (!res.ok) await fail("sound", res);
     return Buffer.from(await res.arrayBuffer());
   });
 }
@@ -83,10 +108,11 @@ export async function music(prompt: string, ms: number): Promise<Buffer> {
           headers: { "xi-api-key": config.elevenKey, "Content-Type": "application/json" },
           body: JSON.stringify({ prompt, music_length_ms: ms, force_instrumental: true, ...(model ? { model_id: model } : {}) }),
         });
-        if (!res.ok) throw new Error(`ElevenLabs music failed: ${res.status} ${await res.text()}`);
+        if (!res.ok) await fail("music", res);
         return Buffer.from(await res.arrayBuffer());
       });
     } catch (e) {
+      if (isOutOfCredits(e)) throw e;
       last = e;
     }
   }
@@ -106,7 +132,7 @@ export async function transcribe(file: Blob): Promise<string> {
     headers: { "xi-api-key": config.elevenKey },
     body: form,
   });
-  if (!res.ok) throw new Error(`ElevenLabs transcription failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) await fail("transcription", res);
   const json = (await res.json()) as { text?: string };
   return (json.text ?? "").trim();
 }

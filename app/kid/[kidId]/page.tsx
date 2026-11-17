@@ -3,13 +3,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
-import { STAGES } from "@/lib/stages";
+import { NO_CREDITS, STAGES, VOICE_CREDITS_MESSAGE } from "@/lib/stages";
 import { InTheWorks } from "@/components/InTheWorks";
 import { useFamily, useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
-import { PillSelect } from "@/components/SkyPage";
+import { Art, PillSelect } from "@/components/SkyPage";
 import { BANDS } from "@/lib/types";
 import { ArrowLeft, Keyboard, Microphone, Stop } from "@phosphor-icons/react";
 import { bandForAge, type Band } from "@/lib/types";
@@ -21,8 +21,12 @@ type Phase =
   | { kind: "confirm"; text: string; source: "voice" | "typed"; options?: string[]; heard?: string }
   | { kind: "sending"; text: string }
   | { kind: "thinking"; askId: string; episodeId: string | null; stage: string }
-  | { kind: "message"; emoji: string; title: string; body: string; approveAskId?: string };
+  | { kind: "message"; emoji: string; title: string; body: string; approveAskId?: string; art?: string };
 
+/** The voices are out of ElevenLabs credits: nothing a kid can fix, so say so kindly and point to a grown-up. */
+function lostVoice(body: string): Phase {
+  return { kind: "message", emoji: "🦦", title: "Cheko lost his voice!", body, art: "lost-voice" };
+}
 
 
 export default function KidPage() {
@@ -106,8 +110,9 @@ export default function KidPage() {
           const { text, options } = await api<{ text: string; options: string[] }>("/api/transcribe", { method: "POST", body: form });
           if (!text || !options?.length) throw new Error("empty");
           setPhase({ kind: "confirm", text: options[0], source: "voice", options, heard: text });
-        } catch {
-          setPhase({ kind: "message", emoji: "👂", title: "Otto didn't quite hear that", body: "Let's try again, nice and loud!" });
+        } catch (e) {
+          if (e instanceof Error && e.message === VOICE_CREDITS_MESSAGE) setPhase(lostVoice("Otto can't listen right now. A grown-up needs to top up the voice credits."));
+          else setPhase({ kind: "message", emoji: "👂", title: "Otto didn't quite hear that", body: "Let's try again, nice and loud!" });
         }
       };
       recorder.current = rec;
@@ -188,6 +193,7 @@ export default function KidPage() {
         const { data: ep } = await supabase().from("episodes").select("stage, status, updated_at").eq("id", ask.episode_id).single();
         if (ep) {
           if (ep.status === "ready") return router.push(`/e/${ask.episode_id}?kid=${kidId}`);
+          if (ep.stage === NO_CREDITS) return setPhase(lostVoice("Your question is saved, and so is everything Otto found out. A grown-up needs to top up the voice credits, then it'll finish recording."));
           setPhase((p) => (p.kind === "thinking" ? { ...p, episodeId: ask.episode_id, stage: ep.stage ?? "queued" } : p));
           const stale = Date.now() - new Date(ep.updated_at).getTime() > 4 * 60 * 1000;
           if (!resumed && (ep.stage === "error" || stale)) {
@@ -328,6 +334,7 @@ export default function KidPage() {
 
         {phase.kind === "thinking" && (
           <>
+            <Art name="making" className="max-h-44 object-contain" fallback={null} />
             <h1 className="text-3xl font-bold">{STAGES[phase.stage] ?? "Making your episode…"}</h1>
             <Dots />
             <p className="max-w-xs text-slate-500">This takes a couple of minutes. Otto checks every fact before he tells you!</p>
@@ -336,7 +343,11 @@ export default function KidPage() {
 
         {phase.kind === "message" && (
           <>
-            <div className="text-7xl">{phase.emoji}</div>
+            {phase.art ? (
+              <Art name={phase.art} className="max-h-44 object-contain" fallback={<div className="text-7xl">{phase.emoji}</div>} />
+            ) : (
+              <div className="text-7xl">{phase.emoji}</div>
+            )}
             <h1 className="text-3xl font-bold">{phase.title}</h1>
             <p className="max-w-xs text-lg text-slate-600">{phase.body}</p>
             {phase.approveAskId ? (

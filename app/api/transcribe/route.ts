@@ -1,5 +1,5 @@
 import { requireFamily } from "@/lib/supabase/admin";
-import { transcribe } from "@/lib/ai/eleven";
+import { elevenErrorResponse, transcribe } from "@/lib/ai/eleven";
 import { claudeJson } from "@/lib/ai/claude";
 import { config } from "@/lib/config";
 import { TIDY_SYSTEM } from "@/lib/prompts";
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   try {
     text = (await transcribe(file)).trim();
   } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "Could not hear that" }, { status: 502 });
+    return elevenErrorResponse(e, "Could not hear that");
   }
   let options: string[] = [];
   if (text) {

@@ -26,7 +26,7 @@ export function CostCard({ familyId }: { familyId: string }) {
 
   return (
     <section className="card space-y-2">
-      <h2 className="text-xl font-semibold">AI costs this month</h2>
+      <h3 className="text-lg font-semibold">AI costs this month</h3>
       {tracked.length === 0 ? (
         <p className="text-slate-500">Costs show here for new episodes made from now on.</p>
       ) : (

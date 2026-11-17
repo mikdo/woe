@@ -35,7 +35,7 @@ export function ShareFamily() {
 
   return (
     <section className="card space-y-3">
-      <h2 className="text-xl font-semibold">Grown-ups in this family</h2>
+      <h3 className="text-lg font-semibold">Grown-ups in this family</h3>
       {info.members.length > 0 && (
         <ul className="space-y-1">
           {info.members.map((m) => (
@@ -51,15 +51,15 @@ export function ShareFamily() {
           <p className="text-slate-600">Send this link to another grown-up. They sign in with their own email and see the same kids, shelves and library.</p>
           {link ? (
             <div className="space-y-2">
-              <p className="break-all rounded-xl bg-orange-50 p-2 text-sm">{link}</p>
-              <div className="flex flex-wrap gap-2">
-                <button className="btn-primary py-2" onClick={share}>{copied ? "Copied!" : "Share link"}</button>
-                <button className="btn-soft py-2" onClick={make}>New link</button>
-                <button className="btn-soft py-2" onClick={() => remove()}>Turn link off</button>
+              <p className="break-all rounded-xl bg-orange-50 px-3 py-2 font-mono text-xs">{link}</p>
+              <button className="btn-primary w-full py-2.5" onClick={share}>{copied ? "Copied!" : "Share link"}</button>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="btn-soft whitespace-nowrap px-3 py-2 text-sm" onClick={make}>New link</button>
+                <button className="btn-soft whitespace-nowrap px-3 py-2 text-sm" onClick={() => remove()}>Turn link off</button>
               </div>
             </div>
           ) : (
-            <button className="btn-primary py-2" onClick={make}>Make an invite link</button>
+            <button className="btn-primary w-full py-2.5" onClick={make}>Make an invite link</button>
           )}
         </>
       ) : (

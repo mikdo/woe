@@ -12,6 +12,12 @@ export const STAGES: Record<string, string> = {
   resuming: "Picking up where we left off…",
 };
 
+/** Shown wherever the ElevenLabs voice credits have run out. */
+export const VOICE_CREDITS_MESSAGE = "The voice credits have run out. Top up ElevenLabs, then tap Try again.";
+
+/** Stages where an episode has stopped and needs a person, so nothing should retry it on its own. */
+export const NO_CREDITS = "no_credits";
+
 const ORDER = ["queued", "researching", "writing", "checking", "fixing", "pronouncing", "recording", "continuing", "sound", "ready"];
 
 /** Rough progress 0..1 for a stage. */

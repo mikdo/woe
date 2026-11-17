@@ -24,7 +24,7 @@ export function SetPassword({ title = "Password", onDone }: { title?: string; on
 
   return (
     <section className="card space-y-3">
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <h3 className="text-lg font-semibold">{title}</h3>
       <input className="input" type="password" autoComplete="new-password" placeholder="New password (8+ characters)" value={pw} onChange={(e) => setPw(e.target.value)} />
       <input className="input" type="password" autoComplete="new-password" placeholder="Type it again" value={pw2} onChange={(e) => setPw2(e.target.value)} />
       {msg && <p className="text-sm text-slate-600">{msg}</p>}

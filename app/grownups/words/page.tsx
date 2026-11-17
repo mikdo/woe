@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
 import { useSession } from "@/lib/hooks";
 import { isGrownUpUnlocked } from "@/components/GrownUpGate";
+import { SkyPage } from "@/components/SkyPage";
+import { ArrowLeft, SpeakerHigh } from "@phosphor-icons/react";
 
 type Word = { id: string; family_id: string | null; word: string; alias: string; approved: boolean };
 
@@ -39,7 +41,7 @@ export default function Words() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token}` },
         body: JSON.stringify({ word, alias }),
       });
-      if (!res.ok) throw new Error("Couldn't play that");
+      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Couldn't play that");
       const url = URL.createObjectURL(await res.blob());
       const a = new Audio(url);
       a.onended = () => URL.revokeObjectURL(url);
@@ -69,22 +71,28 @@ export default function Words() {
   const editable = (w: Word) => w.family_id !== null || canShared;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-5 p-6 pb-28">
-      <header className="flex items-center justify-between">
-        <Link href="/grownups" className="btn-soft px-4 py-2 text-base">← Grown-ups</Link>
-        <h1 className="text-2xl font-bold">How Otto says it</h1>
-      </header>
-      {msg && <p className="card text-center">{msg}</p>}
+    <SkyPage
+      hero={
+        <div className="pb-3">
+          <Link href="/grownups" className="press grid h-11 w-11 place-items-center rounded-full bg-white shadow-[0_3px_0_#e2e8f0]" aria-label="Back to Grown-ups">
+            <ArrowLeft size={20} weight="bold" />
+          </Link>
+          <h1 className="pop-in mt-4 text-[1.75rem] font-black leading-tight">How Otto says it</h1>
+          <p className="mt-1 text-sm font-semibold text-ink/60">Tricky words, and how the voices should say them</p>
+        </div>
+      }
+    >
+      {msg && <p className="pop-in rounded-2xl bg-ink px-4 py-3 text-center text-sm font-semibold text-white">{msg}</p>}
 
       <section className="card space-y-2">
         <p className="text-slate-600">
           Words the voices find tricky, and how to say them. Write the &ldquo;say it like&rdquo; in plain lower case with hyphens, like{" "}
-          <b>pat-a-go-tie-tan</b>. No capitals (the voice spells them out). Tap 🔊 to hear Otto try it. Changes apply to new recordings.
+          <b>pat-a-go-tie-tan</b>. No capitals (the voice spells them out). Tap the speaker to hear Otto try it. Changes apply to new recordings.
         </p>
         <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
           <input className="input" placeholder="Word" value={nw.word} onChange={(e) => setNw({ ...nw, word: e.target.value })} />
           <input className="input" placeholder="Say it like" value={nw.alias} onChange={(e) => setNw({ ...nw, alias: e.target.value })} />
-          <button className="btn-soft px-3" disabled={!nw.word || busy === "new"} onClick={() => hear(nw.word, nw.alias, "new")} aria-label="Hear it">🔊</button>
+          <button className="btn-soft px-3" disabled={!nw.word || busy === "new"} onClick={() => hear(nw.word, nw.alias, "new")} aria-label="Hear it"><SpeakerHigh size={20} weight="fill" /></button>
         </div>
         <button className="btn-primary w-full py-2" disabled={!nw.word || !nw.alias} onClick={add}>Add word</button>
       </section>
@@ -112,7 +120,7 @@ export default function Words() {
                   onChange={(e) => setEdits({ ...edits, [w.id]: e.target.value })}
                 />
                 <button className="btn-soft px-3" disabled={busy === w.id} onClick={() => hear(w.word, val, w.id)} aria-label="Hear it">
-                  {busy === w.id ? "…" : "🔊"}
+                  {busy === w.id ? "…" : <SpeakerHigh size={20} weight="fill" />}
                 </button>
               </div>
               {editable(w) && (
@@ -127,6 +135,6 @@ export default function Words() {
           );
         })}
       </ul>
-    </main>
+    </SkyPage>
   );
 }
