@@ -116,6 +116,41 @@ export async function researchFacts(system: string, question: string, band: stri
   });
 }
 
+/** Mikey's house style for covers, matched to his reference drawing of Otto and Cheko (public/art/style-ref.jpg). */
+export const COVER_STYLE =
+  "Match the reference image's illustration style exactly: bold clean dark outlines, flat colours with simple cel shading, " +
+  "a retro friendly cartoon look, pale sky-blue background feel and soft outlined clouds where it fits. " +
+  "Use the same two characters as the reference: Otto, a cheerful boy explorer with a green bucket hat, orange shirt, brown vest, green pants, " +
+  "brown boots and a backpack; and Cheko, a small tan stuffed-toy otter with stitched seams, round ears and a thick tail. " +
+  "Otto is in the scene, enjoying the adventure. Find-Cheko game: hide Cheko somewhere in the scene, small but findable by a 4 year old " +
+  "(peeking from behind something, tucked in a corner, up high), wearing the costume or form from the scene (e.g. bee stripes and wings, " +
+  "a space helmet). Don't put him in the centre. Square composition, no text, no letters, no logos, no real people.";
+
+let styleRef: Promise<{ mimeType: string; data: string } | null> | null = null;
+/** The reference drawing, loaded once per server instance. */
+function loadStyleRef() {
+  if (!styleRef) {
+    const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+    styleRef = host
+      ? fetch(`https://${host}/art/style-ref.jpg`)
+          .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`style ref ${r.status}`))))
+          .then((b) => ({ mimeType: "image/jpeg", data: Buffer.from(b).toString("base64") }))
+          .catch((e) => {
+            console.error("style reference unavailable", e);
+            styleRef = null;
+            return null;
+          })
+      : Promise.resolve(null);
+  }
+  return styleRef;
+}
+
+/** An episode cover in Mikey's style, with Otto and a hidden Cheko. */
+export async function coverArt(scene: string): Promise<Buffer> {
+  const ref = await loadStyleRef();
+  return makeArt(scene, ref ? [ref] : [], COVER_STYLE);
+}
+
 /** Square picture-book cover art. Returns PNG bytes. */
 export async function makeArt(prompt: string, styleRefs: { mimeType: string; data: string }[] = [], styleOverride?: string): Promise<Buffer> {
   const style = styleOverride ??

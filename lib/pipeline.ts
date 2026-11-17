@@ -2,7 +2,7 @@ import "server-only";
 import { config } from "@/lib/config";
 import { db, type Family } from "@/lib/supabase/admin";
 import { claudeJson } from "@/lib/ai/claude";
-import { checkClaims, embed, makeArt, researchFacts } from "@/lib/ai/gemini";
+import { checkClaims, coverArt, embed, researchFacts } from "@/lib/ai/gemini";
 import { costStep, trackCosts } from "@/lib/ai/cost";
 import { applyAliases, music, soundEffect, speak } from "@/lib/ai/eleven";
 import { CLAIMS_SCHEMA, FIX_SCHEMA, PRONOUNCE_SCHEMA, SAME_SCHEMA, SCRIPT_SCHEMA, TRIAGE_SCHEMA } from "@/lib/schemas";
@@ -271,8 +271,8 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
     });
     const art = ep.art_path
       ? Promise.resolve(ep.art_path as string)
-      : makeArt(script.art_prompt).then(async (png) => {
-          const path = `episodes/${episodeId}/cover.png`;
+      : coverArt(script.art_prompt).then(async (png) => {
+          const path = `episodes/${episodeId}/cover-${Date.now().toString(36)}.png`;
           await upload("shared", path, png, "image/png");
           return path;
         });
