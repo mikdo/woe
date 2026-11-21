@@ -87,7 +87,7 @@ export default function GrownUps() {
   useEffect(() => setUnlocked(isGrownUpUnlocked()), []);
 
   const load = useCallback(async () => {
-    const { data } = await supabase().from("asks").select("*, episodes(stage)").order("created_at", { ascending: false }).limit(50);
+    const { data } = await supabase().from("asks").select("*, episodes!asks_episode_id_fkey(stage)").order("created_at", { ascending: false }).limit(50);
     setAsks((data ?? []) as Ask[]);
   }, []);
   const loadParked = useCallback(async (familyId: string) => {

@@ -41,7 +41,7 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
       const since = Date.now() - 10 * 60 * 1000;
       const { data } = await supabase()
         .from("asks")
-        .select("id, text, status, kid_id, for_all, episode_id, episodes(stage, status, title, updated_at)")
+        .select("id, text, status, kid_id, for_all, episode_id, episodes!asks_episode_id_fkey(stage, status, title, updated_at)")
         .in("status", ["generating", "ready"])
         .eq("created_new", true)
         .order("created_at", { ascending: false })
