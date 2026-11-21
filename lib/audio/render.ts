@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { db } from "@/lib/supabase/admin";
 import type { Script, Segment } from "@/lib/types";
 import { Bus, decode, encode, trim } from "./mix";
@@ -55,7 +56,8 @@ export async function ensureMix(opts: {
 }): Promise<Mix> {
   const { episodeId, script, listenerPath } = opts;
   const segs = script.segments.filter((s) => s.audio_path);
-  const rev = (segs[0]?.audio_path ?? "").split("/").pop()?.split("-")[0] ?? "x";
+  // Any re-recorded segment changes the key, so edited episodes get a fresh mix.
+  const rev = createHash("sha1").update(segs.map((s) => s.audio_path).join("|")).digest("hex").slice(0, 10);
   const base = `${listenerPath}/${episodeId}-${MIX_VERSION}-${rev}${opts.introPath ? "" : "-plain"}`;
   const cached = await fetchFile("personal", `${base}.json`);
   if (cached) return JSON.parse(cached.toString()) as Mix;

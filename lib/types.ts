@@ -58,6 +58,8 @@ export type Segment = {
   transform_after?: boolean;
   answer?: boolean | string | null;
   audio_path?: string;
+  /** The lines were edited after recording: re-voice just this segment. */
+  redo?: boolean;
 };
 
 export type Script = {

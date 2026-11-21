@@ -542,3 +542,40 @@ export async function familyForEpisode(episodeId: string): Promise<Family | null
   const { data: fam } = await db().from("families").select("*").eq("id", data.created_by_family).single();
   return fam as Family | null;
 }
+
+/**
+ * Re-voices only the segments whose lines were edited after recording (marked "redo"),
+ * so old episodes can be fixed without regenerating them. Returns how many are left.
+ */
+export async function rerecordEdited(budgetMs = 200_000): Promise<{ done: number; left: number }> {
+  const started = Date.now();
+  const { data } = await db().from("episodes").select("id, script").eq("status", "ready").contains("script", { segments: [{ redo: true }] });
+  const eps = (data ?? []) as { id: string; script: Script }[];
+  const rules = await pronunciationRules(null);
+  let done = 0;
+  for (const ep of eps) {
+    if (Date.now() - started > budgetMs) break;
+    const script = ep.script;
+    const rev = Date.now().toString(36);
+    try {
+      await inBatches(script.segments, 2, async (seg, i) => {
+      if (!seg.redo) return;
+      const bytes = await speak(seg.lines.map((l) => ({ speaker: l.speaker, text: applyAliases(l.text, rules) })));
+      const path = `episodes/${ep.id}/${rev}-seg-${String(i).padStart(2, "0")}.mp3`;
+      await upload("shared", path, bytes, "audio/mpeg");
+      seg.audio_path = path;
+      delete seg.redo;
+      done++;
+      });
+    } finally {
+      // Keep whatever got recorded, even if the voice credits ran out part-way.
+      await db().from("episodes").update({ script, updated_at: new Date().toISOString() }).eq("id", ep.id);
+    }
+  }
+  return { done, left: await countEdited() };
+}
+
+export async function countEdited(): Promise<number> {
+  const { data } = await db().from("episodes").select("script").eq("status", "ready").contains("script", { segments: [{ redo: true }] });
+  return ((data ?? []) as { script: Script }[]).reduce((n, e) => n + e.script.segments.filter((s) => s.redo).length, 0);
+}

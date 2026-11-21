@@ -385,10 +385,51 @@ export default function GrownUps() {
               🎵 Make the sound kit
             </button>
           </div>
+          <Rerecord onMsg={setMsg} />
           <DrawingSlots />
         </Group>
       )}
     </SkyPage>
+  );
+}
+
+/** Re-voices lines edited after an episode was recorded (e.g. the old "stay curious" sign-offs). Hidden when nothing is waiting. */
+function Rerecord({ onMsg }: { onMsg: (m: string) => void }) {
+  const [left, setLeft] = useState(0);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api<{ left: number }>("/api/admin/rerecord")
+      .then((r) => setLeft(r.left))
+      .catch(() => setLeft(0));
+  }, []);
+  if (!left) return null;
+  return (
+    <div className="card space-y-3">
+      <h3 className="text-lg font-semibold">Edited lines to re-record</h3>
+      <p className="text-sm text-slate-500">
+        {left} {left === 1 ? "part" : "parts"} of older episodes had their words fixed (new sign-off, Cheko staying in his new form). Only
+        those parts get re-voiced; the rest of each episode stays as it is.
+      </p>
+      <button
+        className="btn-primary w-full py-2 text-sm"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          onMsg("Re-recording… this takes a couple of minutes.");
+          try {
+            const r = await api<{ done: number; left: number }>("/api/admin/rerecord", { method: "POST" });
+            setLeft(r.left);
+            onMsg(r.left ? `Re-recorded ${r.done}. ${r.left} left, tap again to finish.` : `All done: re-recorded ${r.done}.`);
+          } catch (e) {
+            onMsg((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "Re-recording…" : `Re-record ${left} ${left === 1 ? "part" : "parts"}`}
+      </button>
+    </div>
   );
 }
 

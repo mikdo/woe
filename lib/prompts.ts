@@ -41,20 +41,20 @@ Every fact must come from a page you actually found. Use metric units. Add an Au
 
 const BAND_RULES: Record<Band, string> = {
   littles: `AGE BAND: LITTLES (ages 2-3)
-- 450-600 words total. Sentences 5-8 words.
-- 2 explainer segments. 1 game: True or False with 3 statements, one obviously silly.
+- 600-750 words total (aim for the middle; count them). Sentences 5-8 words.
+- 3 explainer segments: the simple answer, then one "but why?" layer, then a surprising fact. 1 game: True or False with 3 statements, one obviously silly.
 - 1 new word, taught with PEER and repeated 3 times across the episode.
 - Prompts: fill-the-gap ("Volcanoes are big... mountains!"), animal sounds, body moves, yes/no.
 - Pauses after questions to the child: 2.5 seconds.`,
   bigs: `AGE BAND: BIGS (ages 4-6)
-- 750-950 words total. Sentences under 12 words.
-- 3 explainer segments. 2 games chosen from True or False, quick quiz (two choices), Would You Rather, What Am I? riddle.
+- 1000-1250 words total (aim for the middle; count them). Sentences under 12 words.
+- 4 explainer segments: the simple answer, two "but why?" layers, then a surprising fact. 2 games chosen from True or False, quick quiz (two choices), Would You Rather, What Am I? riddle.
 - 2 new words, each taught with PEER.
 - Prompts: what/where/how questions, "why do you think?", riddles. At most ONE "have you ever...?" or "remember when...?" prompt.
 - Pauses after questions to the child: 2 seconds.`,
   explorers: `AGE BAND: EXPLORERS (ages 7-10)
-- 1100-1400 words total. Sentences under 16 words; real terms explained once.
-- 4 explainer segments, including one "how do scientists know?" moment.
+- 1400-1700 words total (aim for the middle; count them). Sentences under 16 words; real terms explained once.
+- 5 explainer segments: the simple answer, two or three "but why?" layers (one is "how do scientists know?"), then a surprising fact.
 - 2-3 games: quick quiz (three choices), True or False, What Am I? riddle, or a "would you rather" with a reason.
 - 2-3 new words, each taught once with PEER and used again later.
 - Prompts: "why do you think?", predictions, simple comparisons and numbers. Up to two "have you ever...?" prompts.
@@ -73,7 +73,9 @@ CAST
 CHEKO CHANGE-O (kids love this; keep it simple so they're never confused)
 - He transforms exactly ONCE, in the hook, and stays that way for the whole episode, goodbye included. Never change him back,
   never change him twice, and never say he is (or turns into) an otter.
-- Pick a form straight from the topic: something IN the story a child can picture, e.g. bees -> a fuzzy bumblebee,
+- Pick a form straight from the topic that is cute AND funny: something IN the story a child can picture, plus one silly detail
+  that makes kids giggle (a tiny shark in a too-big bucket hat, a jellyfish with wobbly floaties, a lava rock that keeps saying "ooh, warm").
+  Never an otter, never "an otter in a costume": he becomes the thing. e.g. bees -> a fuzzy bumblebee,
   kangaroos -> a bouncy joey, fish -> a little fish with gills, rockets -> a tiny rocket, sky -> a fluffy cloud,
   volcanoes -> a lava rock, sleep -> a sleepy koala, cats -> a purring kitten, dinosaurs -> a baby dinosaur.
 - "Cheko... CHANGE-O!" is his last line in its segment (the app plays a sparkly transformation sound right after).
@@ -100,7 +102,11 @@ STRUCTURE (one segment per beat, in this order)
 1 hello: Otto: "Hey hey! Welcome to What On Earth! I'm Otto." Cheko says a quick hi. (The app then adds who asked today's question, so don't mention the asker.)
 2 hook: Otto: "Whoaaa... what on earth is..." (pause for the kids to shout "WHOA!") then the question. Cheko transforms here (see CHEKO CHANGE-O).
 3 framing: the Wonder Hat trip there (see THE WONDER HAT ADVENTURE), and why the question is puzzling.
-4 explainer (x2 or x3): mini question -> pause -> answer. Analogies to things toddlers touch.
+4 explainer (see AGE BAND for how many): build the answer in layers, like peeling an onion.
+   First the simple answer in a sentence or two. Then Cheko asks "But why?" (or "But how?") and Otto goes one layer deeper,
+   each layer building on the one before. Each layer: mini question -> pause -> answer, with an analogy to something kids touch
+   or do (a straw, a bath, a trampoline), and a quick "so..." line that joins it back to the big question.
+   Finish the explainers with the surprising fact. More explaining, not more padding: no repeated lines or filler chat.
 5 new_word (inside or after an explainer): PEER - say it, break into syllables, "Can you say it?", pause, praise, use it again.
 6 recap: back home after the Wonder Hat trip, the main ideas, one short line each.
 7 game segments: beat "game_tf", "game_quiz", "game_wyr" or "game_riddle". Put each answer in "answer". sfx "drumroll" before reveals, "ding" for true/correct, "boing" for false.
