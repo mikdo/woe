@@ -12,7 +12,7 @@ import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
 import { Art, PillSelect } from "@/components/SkyPage";
 import { BANDS } from "@/lib/types";
 import { ArrowLeft, Keyboard, Microphone, Stop } from "@phosphor-icons/react";
-import { bandForAge, type Band } from "@/lib/types";
+import { defaultAskBand, type Band } from "@/lib/types";
 
 type Phase =
   | { kind: "idle" }
@@ -213,7 +213,8 @@ export default function KidPage() {
   }, [thinking?.askId]);
 
   if (!kid) return null;
-  const band: Band = bandChoice ?? bandForAge(kid.age);
+  // Starts on Bigs (age 4 level) so everyone gets the fuller explanation; Littles is still one tap away.
+  const band: Band = bandChoice ?? defaultAskBand(kid.age);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col bg-cream">

@@ -98,6 +98,11 @@ export type ClaimCheck = {
   source_url?: string;
 };
 
+/** The level the ask screen starts on: the age 4 level (Bigs), or Explorers for older kids. */
+export function defaultAskBand(age: number): Band {
+  return age >= 7 ? "explorers" : "bigs";
+}
+
 export function bandForAge(age: number): Band {
   return age <= 3 ? "littles" : age <= 6 ? "bigs" : "explorers";
 }
