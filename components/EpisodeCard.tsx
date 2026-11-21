@@ -1,5 +1,7 @@
+"use client";
 import Link from "next/link";
-import { CheckCircle, Compass, MoonStars, Star } from "@phosphor-icons/react";
+import { usePlayer } from "@/components/PlayerProvider";
+import { Check, CheckCircle, Compass, ListPlus, MoonStars, Star } from "@phosphor-icons/react";
 import { BANDS, CATEGORIES } from "@/lib/types";
 
 export type EpisodeLite = {
@@ -28,6 +30,11 @@ export function artUrl(path: string | null) {
 export function EpisodeCard({ episode, href }: { episode: EpisodeLite; href: string }) {
   const cat = CATEGORIES.find((c) => c.id === episode.category);
   const art = artUrl(episode.art_path);
+  const player = usePlayer();
+  // While something is playing, any other episode can go in the queue straight from its card.
+  const kid = new URLSearchParams(href.split("?")[1] ?? "").get("kid");
+  const canQueue = Boolean(player.track) && !(player.track?.id === episode.id && player.track?.kid === kid);
+  const queued = player.queue.some((q) => q.id === episode.id && q.kid === kid);
   return (
     <Link href={href} className="press group overflow-hidden rounded-3xl bg-white shadow-[0_4px_0_#f1e4cc] ring-1 ring-orange-100">
       <div className="relative aspect-square" style={{ background: cat?.colour ?? "#38bdf8" }}>
@@ -59,6 +66,19 @@ export function EpisodeCard({ episode, href }: { episode: EpisodeLite; href: str
           <span className="absolute inset-x-2 bottom-1.5 h-1 overflow-hidden rounded-full bg-white/70">
             <span className="block h-full rounded-full bg-ember" style={{ width: `${Math.round((episode.progress ?? 0) * 100)}%` }} />
           </span>
+        )}
+        {canQueue && (
+          <button
+            className={`press absolute bottom-2 right-2 grid h-9 w-9 place-items-center rounded-full shadow ${queued ? "bg-leaf text-white" : "bg-white/90 text-ink"}`}
+            aria-label={queued ? "In the queue" : "Add to queue"}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!queued) player.addToQueue({ id: episode.id, kid, title: episode.title ?? episode.question, art: art });
+            }}
+          >
+            {queued ? <Check size={18} weight="bold" /> : <ListPlus size={18} weight="bold" />}
+          </button>
         )}
         {(() => {
           const b = BANDS.find((x) => x.id === episode.band);

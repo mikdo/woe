@@ -7,7 +7,7 @@ import { useSession } from "@/lib/hooks";
 import { Cheko, Otto } from "@/components/Characters";
 import { CATEGORIES, type Activity, type ClaimCheck } from "@/lib/types";
 import { usePlayer, type Cue } from "@/components/PlayerProvider";
-import { ArrowClockwise, ArrowCounterClockwise, ArrowLeft, CheckCircle, Circle, MagnifyingGlass, Pause, Play, Stop, Star } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowCounterClockwise, ArrowLeft, CheckCircle, Circle, ListPlus, MagnifyingGlass, Pause, Play, Stop, Star } from "@phosphor-icons/react";
 
 type PlayData = {
   episode: {
@@ -128,9 +128,23 @@ function Player() {
   const heard = heardSaved || done || (mine && duration > 0 && time / duration >= 0.8);
   const playing = mine && player.playing;
 
+  const trackFor = (d: PlayData) => ({
+    id,
+    kid,
+    title: d.episode.title,
+    art: d.episode.art_url,
+    url: d.audio.url,
+    duration: d.audio.duration,
+    cues: d.audio.cues,
+  });
+  // Another episode is loaded: this page waits for a tap instead of taking over.
+  const otherPlaying = Boolean(player.track) && !mine;
+  const queued = player.queue.some((q) => q.id === id && q.kid === kid);
+
   function toggle() {
     if (playing) player.pause();
-    else player.play();
+    else if (mine) player.play();
+    else if (data) player.start(trackFor(data));
   }
   function skip(seconds: number) {
     if (mine) player.seek(time + seconds);
@@ -280,6 +294,16 @@ function Player() {
           <SkipButton seconds={15} onClick={() => skip(15)} />
           <span className="h-11 w-11" aria-hidden />
         </div>
+
+        {otherPlaying && data && (
+          <button
+            className="btn-soft self-center py-2 text-sm"
+            disabled={queued}
+            onClick={() => player.addToQueue({ id, kid, title: data.episode.title, art: data.episode.art_url })}
+          >
+            <ListPlus size={18} weight="bold" /> {queued ? "In the queue" : "Add to queue"}
+          </button>
+        )}
 
         <button
           onClick={toggleHeard}
