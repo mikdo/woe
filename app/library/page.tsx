@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase/browser";
 import { useFamily, useSession } from "@/lib/hooks";
@@ -22,6 +22,9 @@ export default function Library() {
   const [cat, setCat] = useState<string>("any");
   const [heard, setHeard] = useState<Heard>("any");
   const [listener, setListener] = useState<string>("all");
+  // Bumped when an episode finishes, so it appears without a refresh.
+  const [fresh, setFresh] = useState(0);
+  const onReady = useCallback(() => setFresh((n) => n + 1), []);
 
   useEffect(() => {
     if (!session) return;
@@ -52,7 +55,7 @@ export default function Library() {
     return () => {
       stop = true;
     };
-  }, [session, tab]);
+  }, [session, tab, fresh]);
 
   const shown = useMemo(
     () =>
@@ -90,7 +93,7 @@ export default function Library() {
         </div>
       </div>
 
-      <InTheWorks />
+      <InTheWorks onReady={onReady} />
 
       <div className="-mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-1">
         <PillSelect

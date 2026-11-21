@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { CaretDown, X } from "@phosphor-icons/react";
 import { api, supabase } from "@/lib/supabase/browser";
 import { NO_CREDITS, STAGES, stageProgress } from "@/lib/stages";
 
@@ -13,6 +14,24 @@ type Row = {
   episode_id: string | null;
   episodes: { stage: string | null; status: string; title: string | null; updated_at: string | null } | null;
 };
+
+const DISMISSED_KEY = "woe-dismissed-ready";
+
+function readDismissed(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissed(ids: Set<string>) {
+  try {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids].slice(-60)));
+  } catch {
+    // Private mode: it just won't be remembered.
+  }
+}
 
 function isStale(r: Row) {
   const t = r.episodes?.updated_at ? new Date(r.episodes.updated_at).getTime() : 0;
@@ -28,6 +47,15 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
   const seen = useRef(new Set<string>());
   const retried = useRef(new Set<string>());
   const [busy, setBusy] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  // Nothing renders until the first fetch, so reading storage here can't cause a hydration mismatch.
+  const [dismissed, setDismissed] = useState<Set<string>>(() => (typeof window === "undefined" ? new Set() : readDismissed()));
+  const dismiss = (askId: string) =>
+    setDismissed((d) => {
+      const next = new Set(d).add(askId);
+      saveDismissed(next);
+      return next;
+    });
 
   async function retry(episodeId: string) {
     setBusy(episodeId);
@@ -38,14 +66,15 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
   useEffect(() => {
     let stop = false;
     async function load() {
-      const since = Date.now() - 10 * 60 * 1000;
+      // A finished one shows for a few minutes (or until it's tapped or closed).
+      const since = Date.now() - 4 * 60 * 1000;
       const { data } = await supabase()
         .from("asks")
         .select("id, text, status, kid_id, for_all, episode_id, episodes!asks_episode_id_fkey(stage, status, title, updated_at)")
         .in("status", ["generating", "ready"])
         .eq("created_new", true)
         .order("created_at", { ascending: false })
-        .limit(12);
+        .limit(20);
       if (stop) return;
       let list = ((data ?? []) as unknown as Row[]).filter(
         (r) => r.status === "generating" || (r.episodes?.updated_at && new Date(r.episodes.updated_at).getTime() > since),
@@ -74,53 +103,93 @@ export function InTheWorks({ kidId, onReady }: { kidId?: string; onReady?: () =>
     };
   }, [kidId, onReady]);
 
-  if (rows.length === 0) return null;
-  return (
-    <section className="space-y-2" aria-live="polite">
-      {rows.map((r) => {
-        const stage = r.episodes?.stage ?? "queued";
-        const ready = r.status === "ready";
-        const noCredits = stage === NO_CREDITS;
-        const failed = noCredits || stage === "error" || stage === "needs_review" || isStale(r);
-        const href = r.episode_id ? `/e/${r.episode_id}${r.for_all ? "?kid=all" : r.kid_id ? `?kid=${r.kid_id}` : ""}` : "#";
-        const body = (
-          <div className={`card flex items-center gap-3 p-3 ${ready ? "ring-4 ring-sun" : ""}`}>
-            <span className={`text-3xl ${ready ? "" : "bob"}`}>{ready ? "🎉" : noCredits ? "🦦" : failed ? "🧐" : "🛠️"}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-lg font-semibold">{r.episodes?.title ?? r.text}</p>
-              <p className="text-sm text-slate-600">
-                {ready
-                  ? "Ready to play!"
-                  : noCredits
-                    ? "Cheko lost his voice: the voice credits ran out. Top up ElevenLabs, then try again."
-                    : stage === "needs_review"
-                    ? "A grown-up needs to check a fact"
-                    : failed
-                      ? "Got stuck. Trying again…"
-                      : STAGES[stage] ?? "Making it…"}
-              </p>
-              {failed && stage !== "needs_review" && r.episode_id && (
-                <button className="mt-1 text-sm font-semibold text-sky-700 underline" disabled={busy === r.episode_id} onClick={() => retry(r.episode_id!)}>
+  const visible = rows.filter((r) => !(r.status === "ready" && dismissed.has(r.id)));
+  if (visible.length === 0) return null;
+  const ready = visible.filter((r) => r.status === "ready");
+  const making = visible.filter((r) => r.status !== "ready");
+  const stateOf = (r: Row) => {
+    const stage = r.episodes?.stage ?? "queued";
+    const noCredits = stage === NO_CREDITS;
+    const failed = noCredits || stage === "error" || stage === "needs_review" || isStale(r);
+    const label = noCredits
+      ? "Cheko lost his voice: top up ElevenLabs, then try again"
+      : stage === "needs_review"
+        ? "A grown-up needs to check a fact"
+        : failed
+          ? "Got stuck. Trying again…"
+          : (STAGES[stage] ?? "Making it…");
+    return { stage, noCredits, failed, label };
+  };
+  const hrefOf = (r: Row) => (r.episode_id ? `/e/${r.episode_id}${r.for_all ? "?kid=all" : r.kid_id ? `?kid=${r.kid_id}` : ""}` : "#");
+
+  // One slim line per episode being made.
+  const slim = (r: Row) => {
+    const st = stateOf(r);
+    return (
+      <li key={r.id} className="flex items-center gap-3 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold">{r.episodes?.title ?? r.text}</p>
+          {st.failed ? (
+            <p className="truncate text-xs text-slate-500">
+              {st.label}{" "}
+              {st.stage !== "needs_review" && r.episode_id && (
+                <button className="font-semibold text-sky-700 underline" disabled={busy === r.episode_id} onClick={() => retry(r.episode_id!)}>
                   {busy === r.episode_id ? "Restarting…" : "Try again"}
                 </button>
               )}
-              {!ready && !failed && (
-                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-orange-100">
-                  <div className="h-full rounded-full bg-sun transition-all duration-700" style={{ width: `${stageProgress(stage) * 100}%` }} />
-                </div>
-              )}
+            </p>
+          ) : (
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-orange-100">
+              <div className="h-full rounded-full bg-sun transition-all duration-700" style={{ width: `${stageProgress(st.stage) * 100}%` }} />
             </div>
-            {ready && <span className="text-2xl">▶</span>}
-          </div>
-        );
-        return ready ? (
-          <Link key={r.id} href={href} className="block transition active:scale-[0.98]">
-            {body}
+          )}
+        </div>
+        {!st.failed && <span className="w-24 shrink-0 truncate text-right text-[11px] text-slate-500">{st.label.replace(/…$/, "")}</span>}
+      </li>
+    );
+  };
+
+  const overall = making.length ? making.reduce((n, r) => n + stageProgress(stateOf(r).stage), 0) / making.length : 0;
+  const stuck = making.filter((r) => stateOf(r).failed).length;
+
+  return (
+    <section className="space-y-2" aria-live="polite">
+      {ready.map((r) => (
+        <div key={r.id} className="card flex items-center gap-3 p-3 ring-4 ring-sun">
+          <Link href={hrefOf(r)} onClick={() => dismiss(r.id)} className="flex min-w-0 flex-1 items-center gap-3 active:scale-[0.98]">
+            <span className="text-2xl">🎉</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-display text-base font-semibold">{r.episodes?.title ?? r.text}</p>
+              <p className="text-sm text-slate-600">Ready to play! ▶</p>
+            </div>
           </Link>
-        ) : (
-          <div key={r.id}>{body}</div>
-        );
-      })}
+          <button className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400" onClick={() => dismiss(r.id)} aria-label="Hide">
+            <X size={18} weight="bold" />
+          </button>
+        </div>
+      ))}
+
+      {making.length === 1 && <ul className="card px-4 py-1">{making.map(slim)}</ul>}
+
+      {making.length > 1 && (
+        <div className="card p-3">
+          <button className="flex w-full items-center gap-3 text-left" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+            <span className="bob text-2xl">🛠️</span>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-base font-semibold">Making {making.length} episodes</p>
+              <p className="text-xs text-slate-500">
+                {stuck ? `${stuck} stuck, trying again · ` : ""}
+                {open ? "Tap to hide" : "Tap to see them"}
+              </p>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-orange-100">
+                <div className="h-full rounded-full bg-sun transition-all duration-700" style={{ width: `${overall * 100}%` }} />
+              </div>
+            </div>
+            <CaretDown size={18} weight="bold" className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+          {open && <ul className="mt-2 divide-y divide-orange-100 border-t border-orange-100">{making.map(slim)}</ul>}
+        </div>
+      )}
     </section>
   );
 }

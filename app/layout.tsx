@@ -6,6 +6,7 @@ import "./globals.css";
 import { RegisterSW } from "@/components/RegisterSW";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { BottomNav } from "@/components/BottomNav";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 export const metadata: Metadata = {
   title: "WOE! What On Earth?",
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <BottomNav />
         </PlayerProvider>
+        <PullToRefresh />
         <RegisterSW />
       </body>
     </html>

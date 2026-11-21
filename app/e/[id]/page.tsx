@@ -133,7 +133,19 @@ function Player() {
       </main>
     );
   }
-  if (!data) return null;
+  if (!data) {
+    // The first play of a new episode can take a few seconds while its audio is put together.
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-4 bg-cream p-6 text-center">
+        <div className="flex items-end gap-2">
+          <Otto size={64} />
+          <div className="bob"><Cheko size={52} /></div>
+        </div>
+        <p className="font-display text-xl font-semibold">Getting it ready…</p>
+        <p className="text-sm text-slate-500">Otto is tuning up the sound.</p>
+      </main>
+    );
+  }
   const cat = CATEGORIES.find((c) => c.id === data.episode.category);
   const night = Boolean(data.episode.bedtime);
 

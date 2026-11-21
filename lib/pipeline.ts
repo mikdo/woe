@@ -1,6 +1,7 @@
 import "server-only";
 import { config } from "@/lib/config";
 import { db, type Family } from "@/lib/supabase/admin";
+import { ensureMix } from "@/lib/audio/render";
 import { claudeJson } from "@/lib/ai/claude";
 import { checkClaims, coverArt, embed, researchFacts } from "@/lib/ai/gemini";
 import { costStep, trackCosts } from "@/lib/ai/cost";
@@ -503,6 +504,38 @@ export async function finishAsk(askId: string, episodeId: string) {
     console.error("personal clips skipped: out of voice credits", episodeId);
   }
   await db().from("asks").update({ status: "ready" }).eq("id", askId);
+  // Mix it now for whoever asked, so the first tap plays straight away instead of mixing then.
+  await warmMix(ask.family_id as string, episodeId, ask.for_all ? "all" : (ask.kid_id as string | null), Boolean(ask.created_new)).catch((e) =>
+    console.error("pre-mix failed (it will mix on first play)", episodeId, e),
+  );
+}
+
+/** Builds the listener's mixed audio ahead of time, the same way the play route would. */
+async function warmMix(familyId: string, episodeId: string, listener: string | null, askedByThem: boolean) {
+  if (!listener) return;
+  const { data: ep } = await db().from("episodes").select("script, bedtime, status").eq("id", episodeId).single();
+  if (!ep || ep.status !== "ready") return;
+  let clips: { intro_path: string | null; outro_path: string | null } | null = null;
+  let hello = "";
+  if (listener === "all") {
+    clips = await ensureGroupClips(familyId, episodeId, askedByThem).catch(() => null);
+    const { data: fk } = await db().from("kids").select("name").eq("family_id", familyId).order("created_at");
+    hello = joinNames((fk ?? []).map((k) => k.name));
+  } else {
+    const { data: kid } = await db().from("kids").select("*").eq("id", listener).maybeSingle();
+    if (!kid) return;
+    clips = await ensurePersonalClips(kid as Kid, episodeId, askedByThem).catch(() => null);
+    hello = kid.name;
+  }
+  await ensureMix({
+    episodeId,
+    script: ep.script as Script,
+    listenerPath: `${familyId}/${listener}`,
+    introPath: clips?.intro_path ?? null,
+    outroPath: clips?.outro_path ?? null,
+    hello,
+    bedtime: Boolean(ep.bedtime),
+  });
 }
 
 export async function ensurePersonalClips(kid: Kid, episodeId: string, askedByThem: boolean) {
