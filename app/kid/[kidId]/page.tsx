@@ -46,7 +46,11 @@ export default function KidPage() {
         }
       : undefined
     : kids.find((k) => k.id === kidId);
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  // From Search: "Ask Otto about it" arrives with the words already typed in.
+  const [phase, setPhase] = useState<Phase>(() => {
+    const ask = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("ask");
+    return ask ? { kind: "confirm", text: ask.slice(0, 300), source: "typed" } : { kind: "idle" };
+  });
   const [approveGate, setApproveGate] = useState<string | null>(null);
   const [gate, setGate] = useState(false);
   const [typed, setTyped] = useState<string | null>(null);

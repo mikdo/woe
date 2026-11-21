@@ -3,10 +3,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useSession } from "@/lib/hooks";
-import { Books, Sparkle, UsersThree, type Icon } from "@phosphor-icons/react";
+import { Books, MagnifyingGlass, Sparkle, UsersThree, type Icon } from "@phosphor-icons/react";
 
 const TABS: { href: string; label: string; icon: Icon; match: (p: string) => boolean }[] = [
   { href: "/", label: "Adventure", icon: Sparkle, match: (p) => p === "/" || p.startsWith("/kid/") },
+  { href: "/search", label: "Search", icon: MagnifyingGlass, match: (p) => p.startsWith("/search") },
   { href: "/library", label: "Library", icon: Books, match: (p) => p.startsWith("/library") || p.startsWith("/e/") },
   { href: "/grownups", label: "Grown-ups", icon: UsersThree, match: (p) => p.startsWith("/grownups") },
 ];
@@ -27,7 +28,7 @@ export function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Main"
     >
-      <ul className="mx-auto grid max-w-xl grid-cols-3">
+      <ul className="mx-auto grid max-w-xl grid-cols-4">
         {TABS.map((t) => {
           const active = t.match(path);
           return (
