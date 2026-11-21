@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle, MoonStars, Star } from "@phosphor-icons/react";
+import { CheckCircle, Compass, MoonStars, Star } from "@phosphor-icons/react";
 import { BANDS, CATEGORIES } from "@/lib/types";
 
 export type EpisodeLite = {
@@ -12,6 +12,7 @@ export type EpisodeLite = {
   status: string;
   band?: string | null;
   bedtime?: boolean | null;
+  kind?: string | null;
   favourite?: boolean;
   /** Listened to by anyone in the family. */
   heard?: boolean;
@@ -68,7 +69,10 @@ export function EpisodeCard({ episode, href }: { episode: EpisodeLite; href: str
           ) : null;
         })()}
       </div>
-      <p className="p-3 text-sm font-bold leading-snug">{episode.title ?? episode.question}</p>
+      <p className="p-3 text-sm font-bold leading-snug">
+        {episode.kind === "journey" && <Compass size={15} weight="bold" className="mr-1 inline -translate-y-px text-ember" aria-label="Journey" />}
+        {episode.title ?? episode.question}
+      </p>
     </Link>
   );
 }

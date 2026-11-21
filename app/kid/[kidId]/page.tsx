@@ -11,7 +11,7 @@ import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
 import { Art, PillSelect } from "@/components/SkyPage";
 import { BANDS } from "@/lib/types";
-import { ArrowLeft, Keyboard, Microphone, MoonStars, Stop } from "@phosphor-icons/react";
+import { ArrowLeft, Compass, Keyboard, Microphone, MoonStars, Question, Stop } from "@phosphor-icons/react";
 import { defaultAskBand, type Band } from "@/lib/types";
 
 type Phase =
@@ -54,6 +54,8 @@ export default function KidPage() {
   const [bandChoice, setBandChoice] = useState<Band | null>(null);
   // "Ask more about this": a follow-up to an episode (from the player).
   const [follow, setFollow] = useState<{ id: string; title: string } | null>(null);
+  // Ask a question, or ask the Wonder Hat to take everyone somewhere.
+  const [mode, setMode] = useState<"question" | "journey">("question");
   // Bedtime story mode is on by default in the evening (6pm to 6am).
   const [bedtime, setBedtime] = useState(() => {
     const h = new Date().getHours();
@@ -85,7 +87,7 @@ export default function KidPage() {
   const loadShelf = useCallback(async () => {
     let q = supabase()
       .from("family_library")
-      .select("favourite, episodes(id, title, question, category, art_path, cheko_form, status, band, bedtime)")
+      .select("favourite, episodes(id, title, question, category, art_path, cheko_form, status, band, bedtime, kind)")
       .order("added_at", { ascending: false })
       .limit(24);
     if (kidId !== "all") q = q.eq("kid_id", kidId);
@@ -112,6 +114,7 @@ export default function KidPage() {
         try {
           const form = new FormData();
           form.append("audio", blob, "question");
+          form.append("kind", mode);
           const { text, options } = await api<{ text: string; options: string[] }>("/api/transcribe", { method: "POST", body: form });
           if (!text || !options?.length) throw new Error("empty");
           setPhase({ kind: "confirm", text: options[0], source: "voice", options, heard: text });
@@ -139,7 +142,7 @@ export default function KidPage() {
     try {
       const r = await api<{ askId: string; status: string; episodeId?: string; reason?: string }>("/api/ask", {
         method: "POST",
-        body: JSON.stringify({ kidId, text, source, band, parentEpisodeId: follow?.id, bedtime }),
+        body: JSON.stringify({ kidId, text, source, band, parentEpisodeId: follow?.id, bedtime, kind: follow ? "question" : mode }),
       });
       setFollow(null);
       handleStatus(r.askId, r.status, r.episodeId ?? null, r.reason);
@@ -262,7 +265,7 @@ export default function KidPage() {
         {phase.kind === "idle" && (
           <>
             <div className="flex w-full items-center justify-between gap-3">
-              <h2 className="text-left text-2xl font-bold">What&apos;s the question?</h2>
+              <h2 className="text-left text-2xl font-bold">{mode === "journey" ? "Where to?" : "What\u2019s the question?"}</h2>
               <PillSelect
                 label="Listening level"
                 value={band}
@@ -270,6 +273,27 @@ export default function KidPage() {
                 onChange={(b) => setBandChoice(b)}
               />
             </div>
+            {!follow && (
+              <div className="flex rounded-full bg-white p-1 ring-1 ring-slate-200" role="radiogroup" aria-label="Question or journey">
+                {(
+                  [
+                    { id: "question", label: "Question", Icon: Question },
+                    { id: "journey", label: "Journey", Icon: Compass },
+                  ] as const
+                ).map(({ id: m, label, Icon }) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === m}
+                    onClick={() => setMode(m)}
+                    className={`press flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-bold ${mode === m ? "bg-ink text-white" : "text-slate-500"}`}
+                  >
+                    <Icon size={16} weight="bold" /> {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               onClick={startRecording}
               className="press grid h-44 w-44 place-items-center rounded-full bg-ember text-white shadow-[0_8px_0_#b5541f] active:shadow-[0_3px_0_#b5541f]"
@@ -277,7 +301,9 @@ export default function KidPage() {
             >
               <Microphone size={84} weight="fill" />
             </button>
-            <p className="text-slate-500">Tap and ask Otto anything</p>
+            <p className="text-slate-500">
+              {mode === "journey" ? "Tap and tell Otto where the Wonder Hat should take you" : "Tap and ask Otto anything"}
+            </p>
             <button
               type="button"
               aria-pressed={bedtime}
@@ -384,7 +410,7 @@ export default function KidPage() {
       {typed !== null && (
         <div className="card space-y-3">
           <label className="block text-sm font-semibold text-slate-600">{isAll ? "The question" : `${kid.name}'s question`}, in their words</label>
-          <input className="input" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Why do cats purr?" />
+          <input className="input" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={mode === "journey" ? "Take us to the jungle!" : "Why do cats purr?"} />
           <div className="flex justify-end gap-2">
             <button className="btn-soft" onClick={() => setTyped(null)}>Cancel</button>
             <button

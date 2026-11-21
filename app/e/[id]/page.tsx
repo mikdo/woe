@@ -17,6 +17,7 @@ type PlayData = {
     category: string | null;
     cheko_form: string | null;
     bedtime?: boolean;
+    kind?: string;
     art_url: string | null;
     talk_about_it: string[];
     new_words: { word: string; say_as: string }[];
@@ -188,6 +189,7 @@ function Player() {
           <h1 className="text-2xl font-bold leading-tight">{data.episode.title}</h1>
           {cat && (
             <p className="mt-1 text-sm font-semibold text-slate-500">
+              {data.episode.kind === "journey" ? "🧭 Journey · " : ""}
               {night ? "🌙 Bedtime story · " : ""}
               {cat.emoji} {cat.label}
             </p>

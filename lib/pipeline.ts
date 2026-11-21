@@ -30,15 +30,16 @@ type Triage = {
   question: string;
   category: Category;
   cheko_form: ChekoForm;
+  kind: "question" | "journey";
 };
 
 type Kid = { id: string; family_id: string; name: string; name_say_as: string | null; age: number };
 
-export async function triage(text: string, band: Band): Promise<Triage> {
+export async function triage(text: string, band: Band, journeyMode = false): Promise<Triage> {
   return claudeJson<Triage>({
     model: config.claudeFast,
     system: TRIAGE_SYSTEM,
-    user: `Age band: ${band}\nChild's question (from speech-to-text or a parent): "${text}"`,
+    user: `Age band: ${band}${journeyMode ? "\nMode: the grown-up chose Journey (kind must be journey)" : ""}\nChild's question (from speech-to-text or a parent): "${text}"`,
     maxTokens: 4000,
     schema: TRIAGE_SCHEMA,
   });
@@ -50,6 +51,7 @@ export async function findMatch(
   band: Band,
   familyId: string,
   bedtime = false,
+  kind: "question" | "journey" = "question",
 ): Promise<{ episodeId: string; embedding: number[] } | { episodeId: null; embedding: number[] }> {
   const embedding = await embed(question);
   const { data } = await db().rpc("match_questions", {
@@ -63,9 +65,10 @@ export async function findMatch(
   );
   // Bedtime and daytime episodes answer the same question very differently, so they never stand in for each other.
   if (candidates.length) {
-    const { data: modes } = await db().from("episodes").select("id, bedtime").in("id", candidates.map((c) => c.episode_id));
-    const isBedtime = new Map((modes ?? []).map((m) => [m.id as string, Boolean(m.bedtime)]));
-    candidates = candidates.filter((c) => (isBedtime.get(c.episode_id) ?? false) === bedtime);
+    // Journeys and questions are different kinds of episode too.
+    const { data: modes } = await db().from("episodes").select("id, bedtime, kind").in("id", candidates.map((c) => c.episode_id));
+    const mode = new Map((modes ?? []).map((m) => [m.id as string, `${Boolean(m.bedtime)}:${m.kind ?? "question"}`]));
+    candidates = candidates.filter((c) => mode.get(c.episode_id) === `${bedtime}:${kind}`);
   }
   for (const c of candidates) {
     if (c.similarity > 0.97) return { episodeId: c.episode_id, embedding };
@@ -138,6 +141,7 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
   if (!ep || ep.status === "ready") return;
   const band = ep.band as Band;
   const bedtime = Boolean(ep.bedtime);
+  const journey = ep.kind === "journey";
   const previous = await previousEpisode(ep.parent_episode_id as string | null);
   const started = Date.now();
   // Functions stop at 5 minutes: past ~3, hand the rest to a fresh run.
@@ -150,11 +154,11 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       await setStage(episodeId, "researching");
       costStep("research");
       // Gemini researches with Google Search (much cheaper); Claude's web search is the fallback.
-      facts = await researchFacts(RESEARCH_SYSTEM, researchQuestion(ep.question, previous), band).catch(async (e) => {
+      facts = await researchFacts(RESEARCH_SYSTEM, researchQuestion(ep.question, previous, journey), band).catch(async (e) => {
         console.error("Gemini research failed, using Claude", episodeId, e);
         const r = await claudeJson<{ facts: Fact[] }>({
           system: RESEARCH_SYSTEM,
-          user: `Question from a child: ${researchQuestion(ep.question, previous)}\nAge band: ${band}`,
+          user: `Question from a child: ${researchQuestion(ep.question, previous, journey)}\nAge band: ${band}`,
           webSearch: true,
           maxTokens: 16000,
         });
@@ -173,10 +177,10 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       if (!script) {
         await setStage(episodeId, "writing");
         costStep("script");
-        script = await claudeJson<Script>({ system: scriptSystem(band, bedtime), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+        script = await claudeJson<Script>({ system: scriptSystem(band, bedtime, journey), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
         if (!scriptLooksComplete(script)) {
           console.error("script incomplete, writing again", episodeId);
-          script = await claudeJson<Script>({ system: scriptSystem(band, bedtime), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+          script = await claudeJson<Script>({ system: scriptSystem(band, bedtime, journey), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
         }
         if (!scriptLooksComplete(script)) throw new Error("The script came back incomplete");
         await db().from("episodes").update({ script }).eq("id", episodeId);

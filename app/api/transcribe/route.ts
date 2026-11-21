@@ -17,6 +17,7 @@ export async function POST(req: Request) {
   if (auth instanceof Response) return auth;
   const form = await req.formData();
   const file = form.get("audio");
+  const journey = form.get("kind") === "journey";
   if (!(file instanceof Blob) || file.size === 0) return Response.json({ error: "No audio" }, { status: 400 });
   if (file.size > 5 * 1024 * 1024) return Response.json({ error: "Too long" }, { status: 413 });
   let text: string;
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   let options: string[] = [];
   if (text) {
     try {
-      const r = await claudeJson<{ options: string[] }>({ model: config.claudeFast, system: TIDY_SYSTEM, user: text, maxTokens: 1500, schema: TIDY_SCHEMA });
+      const r = await claudeJson<{ options: string[] }>({ model: config.claudeFast, system: TIDY_SYSTEM, user: journey ? `JOURNEY MODE\n${text}` : text, maxTokens: 1500, schema: TIDY_SCHEMA });
       options = (r.options ?? []).map((o) => o.trim()).filter(Boolean).slice(0, 3);
     } catch (e) {
       console.error("tidy failed", e);

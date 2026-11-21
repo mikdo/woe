@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const missing = missingKeys();
   if (missing.length) return Response.json({ error: `Server is missing: ${missing.join(", ")}` }, { status: 503 });
 
-  const body = (await req.json()) as { kidId?: string; text?: string; source?: "voice" | "typed"; band?: Band; parentEpisodeId?: string; bedtime?: boolean };
+  const body = (await req.json()) as { kidId?: string; text?: string; source?: "voice" | "typed"; band?: Band; parentEpisodeId?: string; bedtime?: boolean; kind?: "question" | "journey" };
   const text = (body.text ?? "").trim().slice(0, 300);
   if (!text) return Response.json({ error: "No question" }, { status: 400 });
 
@@ -33,7 +33,8 @@ export async function POST(req: Request) {
     if (parent && (parent.shared || parent.created_by_family === auth.family.id)) parentId = parent.id;
   }
 
-  const t = await triage(text, band);
+  const t = await triage(text, band, body.kind === "journey");
+  const kind = body.kind === "journey" || t.kind === "journey" ? "journey" : "question";
   const status =
     t.verdict === "ok" ? "triage" : t.verdict === "needs_grownup" ? "needs_grownup" : t.verdict === "not_suitable" ? "not_suitable" : "failed";
 
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
       triage_reason: t.verdict === "unclear" ? `unclear: ${t.reason}` : t.reason,
       parent_episode_id: parentId,
       bedtime: Boolean(body.bedtime),
+      kind,
     })
     .select("id")
     .single();
@@ -67,6 +69,7 @@ export async function POST(req: Request) {
     chekoForm: t.cheko_form,
     parentEpisodeId: parentId,
     bedtime: Boolean(body.bedtime),
+    kind,
   });
-  return Response.json({ ...result, question: t.question });
+  return Response.json({ ...result, question: t.question, kind });
 }

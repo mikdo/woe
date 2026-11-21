@@ -103,6 +103,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       cheko_form: ep.cheko_form,
       band: ep.band,
       bedtime: Boolean(ep.bedtime),
+      kind: ep.kind ?? "question",
       art_url: ep.art_path ? publicUrl(ep.art_path) : null,
       talk_about_it: ep.talk_about_it ?? [],
       new_words: script.new_words ?? [],

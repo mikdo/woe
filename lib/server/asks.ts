@@ -16,10 +16,12 @@ export async function proceedAsk(opts: {
   chekoForm?: string;
   parentEpisodeId?: string | null;
   bedtime?: boolean;
+  kind?: "question" | "journey";
 }): Promise<AskResult> {
   const { askId, family, question, band } = opts;
   const bedtime = Boolean(opts.bedtime);
-  const match = await findMatch(question, band, family.id, bedtime);
+  const kind = opts.kind === "journey" ? "journey" : "question";
+  const match = await findMatch(question, band, family.id, bedtime, kind);
 
   if (match.episodeId) {
     const { data: ep } = await db().from("episodes").select("id, status").eq("id", match.episodeId).single();
@@ -53,6 +55,7 @@ export async function proceedAsk(opts: {
       created_by_family: family.id,
       parent_episode_id: opts.parentEpisodeId ?? null,
       bedtime,
+      kind,
     })
     .select("id")
     .single();

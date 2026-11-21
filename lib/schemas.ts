@@ -15,6 +15,7 @@ export const TRIAGE_SCHEMA = obj({
   question: str,
   category: str,
   cheko_form: { type: "string", enum: ["otter", "dino", "robot", "dragon", "doctor", "diver"] },
+  kind: { type: "string", enum: ["question", "journey"] },
 });
 
 /** Clean question options from a rambling little-kid recording. */

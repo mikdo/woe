@@ -47,7 +47,7 @@ export default function Home() {
     if (!session) return;
     supabase()
       .from("listens")
-      .select("listener, position, duration, updated_at, episodes(id, title, question, category, art_path, cheko_form, status, band, bedtime)")
+      .select("listener, position, duration, updated_at, episodes(id, title, question, category, art_path, cheko_form, status, band, bedtime, kind)")
       .eq("heard", false)
       .gt("position", 10)
       .order("updated_at", { ascending: false })

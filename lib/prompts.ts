@@ -7,7 +7,7 @@ const FORM_RULES =
 
 export const TRIAGE_SYSTEM = `You screen questions from children (ages 2-10) for "What On Earth?" (WOE!), a gentle Australian science show.
 Return ONLY JSON:
-{"verdict":"ok"|"needs_grownup"|"not_suitable"|"unclear","reason":"short reason for the parent","question":"the question tidied into a clear child's question, e.g. 'Why is the sky blue?'","category":"one of: ${CATEGORY_LIST}","cheko_form":"otter|dino|robot|dragon|doctor|diver"}
+{"verdict":"ok"|"needs_grownup"|"not_suitable"|"unclear","reason":"short reason for the parent","question":"the question tidied into a clear child's question, e.g. 'Why is the sky blue?'","category":"one of: ${CATEGORY_LIST}","cheko_form":"otter|dino|robot|dragon|doctor|diver","kind":"question|journey"}
 Rules:
 A grown-up is usually listening, and the show always explains things gently and reassuringly, so lean towards "ok".
 - "ok": almost everything: nature, science, animals (including dangerous ones), bodies (non-private, including blood, bones, poo, germs, getting sick in general),
@@ -18,6 +18,10 @@ A grown-up is usually listening, and the show always explains things gently and 
   or asks for personal information. Asking WHY something dangerous happens (why bushfires start) is "ok", not this.
 - "unclear": you cannot tell what is being asked (speech-to-text mishears are common; guess generously first).
 - Keep the child's meaning; do not change the topic.
+- kind: "journey" when they want to be taken somewhere or explore a place rather than have one thing explained
+  ("take us to the jungle", "can we go to space?", "let's explore under the sea", "can we visit all the planets?").
+  Otherwise "question". If the grown-up chose Journey mode, it is always "journey".
+  For a journey, "question" is a short journey title starting "A journey ", e.g. "A journey through the rainforest", "A journey to all the planets".
 - ${FORM_RULES}`;
 
 export const TIDY_SYSTEM = `A 2-6 year old asked a question out loud and it was transcribed. Little kids ramble: "um, yep, hey, ok, why do, um dinosaurs, like um volcanoes".
@@ -27,6 +31,8 @@ Work out what they most likely want to know and write 1-3 short, clear questions
 - Each question under 12 words, starts with a question word where natural, ends with "?". Australian spelling.
 - Best guess first. If the words are already a clear question, return just that one, tidied.
 - If there is no real question in it, return an empty list.
+- JOURNEY MODE (when the message says so): they are naming a place to explore. Return 1-3 short journey titles instead,
+  e.g. "um the jungle, with monkeys" -> "A journey through the jungle", "A journey to meet jungle monkeys".
 Return JSON: {"options":["...","..."]}`;
 
 export const SAME_QUESTION_SYSTEM = `Decide if two children's questions would be fully answered by the same short science episode for a young child.
@@ -86,7 +92,33 @@ This episode is played at bedtime, in a dark room, to help a child wind down and
 - activities: still 3, but calm ones for right now in bed or for tomorrow (a quiet "explore" like listening for night sounds,
   a slow "move" like stretching like a cat, a "draw" for the morning).`;
 
-export function scriptSystem(band: Band, bedtime = false) {
+const JOURNEY_STOPS: Record<Band, number> = { littles: 3, bigs: 4, explorers: 5 };
+
+function journeyRules(band: Band) {
+  const stops = JOURNEY_STOPS[band];
+  return `JOURNEY MODE (this overrides the STRUCTURE above where they conflict)
+This episode is a guided journey, not one question: the Wonder Hat takes Otto, Cheko and the listener on a tour of a place,
+with ${stops} stops. The "question" is the journey's title (e.g. "A journey through the rainforest"). The facts are still the point.
+- title: a fun journey title, e.g. "Into the Rainforest!" or "Our Trip to All the Planets".
+- hello as usual. hook: Otto: "Whoaaa... what on earth is... out there in [the place]?" (pause for "WHOA!"), then "Today we're going on a journey!"
+  Cheko transforms once into something from this world (a tree frog, a little astronaut, a baby turtle) with one silly detail, and stays that way.
+- framing: "Hold onto your hats! Wonder Hat... SPIN!" and arrive at stop 1. Set fx to the spin.
+- STOPS: ${stops} "explainer" segments, one per stop, in a sensible order (forest floor -> understorey -> canopy -> river at dusk;
+  or Mercury -> Venus -> Earth -> Mars...). Each stop:
+  1) arrive and paint it with the senses in a line or two (what we see, hear, smell, feel), with an fx for its sound where it helps;
+  2) a "spot it" prompt for the child ("Can you hear the frog? What colour do you think it is?") with a pause;
+  3) one "but why?" or "but how?" explained simply, with an analogy kids know;
+  4) a short travel line to the next stop ("Next stop... up, up, up to the treetops!"). Keep the sense of moving through the place.
+  Teach the new word(s) at a stop where they belong.
+- recap: "Wonder Hat... SPIN!" home, then one line per stop, like flicking through holiday photos.
+- games: as the age band says, about things from the stops.
+- final_answer: what made this place so special, in one sentence, and Cheko's favourite stop.
+- follow_ups: one per stop or creature they met, to go deeper later ("Why do sloths move so slowly?").
+- art_prompt: the most wonderful stop of the journey; Cheko hidden in his form.
+- ambience: the place's soundscape. Up to 6 fx is fine for a journey (one per stop plus the spins).`;
+}
+
+export function scriptSystem(band: Band, bedtime = false, journey = false) {
   return `You write episodes of "What On Earth?" (WOE!, said "Whoa!"), a warm, slow-paced Australian science audio show.
 
 CAST
@@ -190,7 +222,7 @@ Return ONLY JSON:
  "segments":[{"beat":"hello","lines":[{"speaker":"otto","text":"..."},{"speaker":"cheko","text":"..."}],"facts":[],"pause_after_s":0,"sfx":null,"fx":null,"answer":null}],
  "ambience":"...",
  "art_prompt":"...","talk_about_it":["...","...","..."],"follow_ups":["...","...","..."],"grownup_fact":"...",
- "activities":[{"kind":"make","title":"...","minutes":10,"need":["..."],"steps":["...","..."],"talk":"...","safety":null}]}${bedtime ? `\n\n${BEDTIME_RULES}` : ""}`;
+ "activities":[{"kind":"make","title":"...","minutes":10,"need":["..."],"steps":["...","..."],"talk":"...","safety":null}]}${journey ? `\n\n${journeyRules(band)}` : ""}${bedtime ? `\n\n${BEDTIME_RULES}` : ""}`;
 }
 
 export type PreviousEpisode = { title: string; question: string; learned: string };
@@ -206,7 +238,13 @@ Don't re-explain what they already know, just remind them in a line where it hel
 }
 
 /** Research brief for a follow-up, so new facts go further instead of repeating. */
-export function researchQuestion(question: string, previous?: PreviousEpisode | null) {
+export function researchQuestion(question: string, previous?: PreviousEpisode | null, journey = false) {
+  if (journey) {
+    return `${question}
+(This is a guided JOURNEY for children, not one question. Pick 3-5 distinct stops that make a sensible tour of this place,
+and give 2-3 facts for each stop: what you would see and hear there, one "why" or "how" a child would wonder about, and a surprising fact.
+Give 10-14 facts in all, each starting with the stop's name in brackets, e.g. "[Canopy] ...". Prefer an Australian place or connection where natural.)`;
+  }
   return previous ? `${question}\n(Follow-up to "${previous.question}". Already covered: ${previous.learned}. Find NEW facts that go further.)` : question;
 }
 
