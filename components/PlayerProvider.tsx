@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { ListPlus, Pause, Play, SkipForward, X } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowCounterClockwise, ArrowSquareOut, CaretDown, ListPlus, Pause, Play, SkipForward, Stop, Trash, X } from "@phosphor-icons/react";
 import { api, supabase } from "@/lib/supabase/browser";
 
 export type Cue = { start: number; end: number; caption: string; kind: string; think?: boolean };
@@ -21,6 +21,9 @@ type Player = {
   queue: QueueItem[];
   addToQueue: (q: QueueItem) => void;
   removeFromQueue: (id: string, kid: string | null) => void;
+  /** Move a queued episode to the front. */
+  playNext: (id: string, kid: string | null) => void;
+  clearQueue: () => void;
   /** Play the next episode in the queue now. */
   next: () => void;
   play: () => void;
@@ -161,6 +164,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setQueue((q) => q.filter((x) => !(x.id === id && x.kid === kid)));
   }, []);
 
+  const playNext = useCallback((id: string, kid: string | null) => {
+    setQueue((q) => {
+      const item = q.find((x) => x.id === id && x.kid === kid);
+      return item ? [item, ...q.filter((x) => x !== item)] : q;
+    });
+  }, []);
+  const clearQueue = useCallback(() => setQueue([]), []);
+
   const next = useCallback(async () => {
     const item = queue[0];
     if (!item) return;
@@ -266,7 +277,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <Ctx.Provider value={{ track, playing, time, load, start, queue, addToQueue, removeFromQueue, next, play, pause, seek, stop, close }}>
+    <Ctx.Provider value={{ track, playing, time, load, start, queue, addToQueue, removeFromQueue, playNext, clearQueue, next, play, pause, seek, stop, close }}>
       {children}
       <MiniPlayer />
       <audio
@@ -293,10 +304,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+function clock(sec: number) {
+  const m = Math.floor(sec / 60);
+  return `${m}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+}
+
 function MiniPlayer() {
   const p = useContext(Ctx)!;
   const path = usePathname();
-  const [openQueue, setOpenQueue] = useState(false);
+  const [open, setOpen] = useState(false);
   // Hidden only on the page of the episode that's playing (that page is the full player).
   const show = Boolean(p.track) && !path.startsWith(`/e/${p.track?.id}`);
   // Leave room at the bottom of the page so the bar never covers buttons.
@@ -305,71 +321,208 @@ function MiniPlayer() {
     return () => document.documentElement.classList.remove("has-mini-player");
   }, [show]);
   if (!p.track || !show) return null;
-  const href = `/e/${p.track.id}${p.track.kid ? `?kid=${p.track.kid}` : ""}`;
   const pct = p.track.duration ? (p.time / p.track.duration) * 100 : 0;
   return (
-    <div
-      style={{ bottom: "calc(var(--nav-h) + 0.5rem + env(safe-area-inset-bottom))" }}
-      className="pop-in fixed inset-x-3 z-50 mx-auto max-w-xl overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_28px_rgba(0,0,0,.14)] ring-1 ring-black/5 backdrop-blur"
-    >
-      <div className="flex items-center gap-3 p-2 pr-3">
-        <Link href={href} className="flex min-w-0 flex-1 items-center gap-3">
-          {p.track.art ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={p.track.art} alt="" className="h-11 w-11 rounded-xl object-cover" />
-          ) : (
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-sky-wash text-xl">🌏</span>
-          )}
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-bold">{p.track.title}</span>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-              {p.playing && (
-                <span className="eq flex h-3 items-end gap-[2px] text-ember" aria-hidden>
-                  <span className="h-3" /><span className="h-3" /><span className="h-3" />
-                </span>
-              )}
-              Otto &amp; Cheko
+    <>
+      <div
+        style={{ bottom: "calc(var(--nav-h) + 0.5rem + env(safe-area-inset-bottom))" }}
+        className="pop-in fixed inset-x-3 z-50 mx-auto max-w-xl overflow-hidden rounded-2xl bg-white/95 shadow-[0_8px_28px_rgba(0,0,0,.14)] ring-1 ring-black/5 backdrop-blur"
+      >
+        <div className="flex items-center gap-3 p-2 pr-3">
+          <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setOpen(true)} aria-label="Open now playing">
+            {p.track.art ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.track.art} alt="" className="h-11 w-11 rounded-xl object-cover" />
+            ) : (
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-sky-wash text-xl">🌏</span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-bold">{p.track.title}</span>
+              <span className="flex items-center gap-1.5 truncate text-xs font-semibold text-slate-500">
+                {p.playing && (
+                  <span className="eq flex h-3 items-end gap-[2px] text-ember" aria-hidden>
+                    <span className="h-3" /><span className="h-3" /><span className="h-3" />
+                  </span>
+                )}
+                {p.queue.length ? `Up next: ${p.queue[0].title}` : "Otto & Cheko"}
+              </span>
             </span>
-          </span>
-        </Link>
-        <button
-          className="press grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ember text-white"
-          onClick={p.playing ? p.pause : p.play}
-          aria-label={p.playing ? "Pause" : "Play"}
-        >
-          {p.playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" className="translate-x-px" />}
-        </button>
-        {p.queue.length > 0 && (
-          <button className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink" onClick={p.next} aria-label="Play next in queue">
-            <SkipForward size={18} weight="fill" />
           </button>
-        )}
-        <button className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400" onClick={p.close} aria-label="Stop">
-          <X size={18} weight="bold" />
-        </button>
+          <button
+            className="press grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ember text-white"
+            onClick={p.playing ? p.pause : p.play}
+            aria-label={p.playing ? "Pause" : "Play"}
+          >
+            {p.playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" className="translate-x-px" />}
+          </button>
+          {p.queue.length > 0 ? (
+            <button className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink" onClick={p.next} aria-label="Play next in queue">
+              <SkipForward size={18} weight="fill" />
+            </button>
+          ) : (
+            <button className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400" onClick={p.close} aria-label="Stop">
+              <X size={18} weight="bold" />
+            </button>
+          )}
+        </div>
+        <div className="absolute inset-x-3 bottom-0 h-[3px] overflow-hidden rounded-full bg-orange-100">
+          <div className="h-full rounded-full bg-ember transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        </div>
       </div>
-      {p.queue.length > 0 && (
-        <button className="block w-full px-3 pb-2 text-left text-xs font-bold text-slate-500" onClick={() => setOpenQueue((o) => !o)} aria-expanded={openQueue}>
-          <ListPlus size={14} weight="bold" className="mr-1 inline -translate-y-px" />
-          Up next: {p.queue[0].title}
-          {p.queue.length > 1 ? ` +${p.queue.length - 1} more` : ""}
-        </button>
-      )}
-      {openQueue && p.queue.length > 0 && (
-        <ol className="max-h-56 space-y-1 overflow-y-auto border-t border-orange-100 px-3 py-2">
-          {p.queue.map((q, i) => (
-            <li key={`${q.id}:${q.kid}`} className="flex items-center gap-2 text-sm">
-              <span className="w-4 text-xs font-bold text-slate-400">{i + 1}</span>
-              <span className="min-w-0 flex-1 truncate font-semibold">{q.title}</span>
-              <button className="press grid h-8 w-8 place-items-center rounded-full text-slate-400" onClick={() => p.removeFromQueue(q.id, q.kid)} aria-label={`Remove ${q.title} from the queue`}>
-                <X size={14} weight="bold" />
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
-      <div className="absolute inset-x-3 bottom-0 h-[3px] overflow-hidden rounded-full bg-orange-100">
-        <div className="h-full rounded-full bg-ember transition-[width] duration-500" style={{ width: `${pct}%` }} />
+      {open && <NowPlaying onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/** The mini player opened up: big cover, controls, what's up next, and a few options. Swipe down to close. */
+function NowPlaying({ onClose }: { onClose: () => void }) {
+  const p = useContext(Ctx)!;
+  const [dy, setDy] = useState(0);
+  const startY = useRef<number | null>(null);
+  const t = p.track;
+  if (!t) return null;
+  const href = `/e/${t.id}${t.kid ? `?kid=${t.kid}` : ""}`;
+  const pct = t.duration ? Math.min(100, (p.time / t.duration) * 100) : 0;
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black/30" role="dialog" aria-label="Now playing" onClick={onClose}>
+      <div
+        className="sheet-up mt-auto flex max-h-[94dvh] w-full flex-col overflow-y-auto rounded-t-[2rem] bg-cream shadow-2xl sm:mx-auto sm:max-w-xl"
+        style={{ transform: dy ? `translateY(${dy}px)` : undefined, paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}
+        onClick={(e) => e.stopPropagation()}
+        onTouchStart={(e) => {
+          if (e.currentTarget.scrollTop <= 0) startY.current = e.touches[0].clientY;
+        }}
+        onTouchMove={(e) => {
+          if (startY.current === null) return;
+          setDy(Math.max(0, e.touches[0].clientY - startY.current));
+        }}
+        onTouchEnd={() => {
+          startY.current = null;
+          if (dy > 90) onClose();
+          else setDy(0);
+        }}
+      >
+        <div className="flex items-center justify-between px-4 pt-3">
+          <button className="press grid h-11 w-11 place-items-center rounded-full" onClick={onClose} aria-label="Close">
+            <CaretDown size={24} weight="bold" />
+          </button>
+          <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Now playing</span>
+          <span className="h-11 w-11" aria-hidden />
+        </div>
+
+        <div className="px-6">
+          <div className="mx-auto mt-2 aspect-square w-full max-w-sm overflow-hidden rounded-3xl bg-sky-wash shadow-lg">
+            {t.art ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={t.art} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="grid h-full place-items-center text-7xl">🌏</div>
+            )}
+          </div>
+          <h2 className="mt-5 text-xl font-bold leading-tight">{t.title}</h2>
+          <p className="text-sm font-semibold text-slate-500">Otto &amp; Cheko</p>
+
+          <input
+            type="range"
+            min={0}
+            max={Math.max(1, Math.floor(t.duration))}
+            step={1}
+            value={Math.floor(p.time)}
+            onChange={(e) => p.seek(Number(e.target.value))}
+            className="scrub mt-4 w-full"
+            style={{ ["--pct" as string]: `${pct}%` }}
+            aria-label="Where you are in the episode"
+          />
+          <div className="flex justify-between text-xs font-bold tabular-nums text-slate-500">
+            <span>{clock(p.time)}</span>
+            <span>-{clock(Math.max(0, t.duration - p.time))}</span>
+          </div>
+
+          <div className="mt-2 flex items-center justify-center gap-5">
+            <button className="press grid h-11 w-11 place-items-center text-slate-400" onClick={p.stop} aria-label="Stop">
+              <Stop size={26} weight="fill" />
+            </button>
+            <button className="press grid h-12 w-12 place-items-center" onClick={() => p.seek(p.time - 15)} aria-label="Back 15 seconds">
+              <ArrowCounterClockwise size={40} weight="bold" />
+            </button>
+            <button
+              className="press grid h-[72px] w-[72px] place-items-center rounded-full bg-ember text-white shadow-[0_5px_0_#b5541f]"
+              onClick={p.playing ? p.pause : p.play}
+              aria-label={p.playing ? "Pause" : "Play"}
+            >
+              {p.playing ? <Pause size={34} weight="fill" /> : <Play size={34} weight="fill" className="translate-x-0.5" />}
+            </button>
+            <button className="press grid h-12 w-12 place-items-center" onClick={() => p.seek(p.time + 15)} aria-label="Forward 15 seconds">
+              <ArrowClockwise size={40} weight="bold" />
+            </button>
+            <button
+              className="press grid h-11 w-11 place-items-center disabled:opacity-30"
+              onClick={p.next}
+              disabled={!p.queue.length}
+              aria-label="Play next in queue"
+            >
+              <SkipForward size={26} weight="fill" />
+            </button>
+          </div>
+
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link href={href} onClick={onClose} className="btn-soft py-2 text-sm">
+              <ArrowSquareOut size={18} weight="bold" /> Open episode
+            </Link>
+            <button
+              className="btn-soft py-2 text-sm"
+              onClick={() => {
+                p.close();
+                onClose();
+              }}
+            >
+              <X size={18} weight="bold" /> Stop and close
+            </button>
+          </div>
+
+          <section className="mt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Up next</h3>
+              {p.queue.length > 1 && (
+                <button className="flex items-center gap-1 text-sm font-semibold text-slate-500" onClick={p.clearQueue}>
+                  <Trash size={16} weight="bold" /> Clear
+                </button>
+              )}
+            </div>
+            {p.queue.length === 0 ? (
+              <p className="mt-1 text-sm text-slate-500">
+                <ListPlus size={16} weight="bold" className="mr-1 inline -translate-y-px" />
+                Nothing yet. Tap the queue button on any episode to add it.
+              </p>
+            ) : (
+              <ol className="mt-2 space-y-2">
+                {p.queue.map((q, i) => (
+                  <li key={`${q.id}:${q.kid}`} className="flex items-center gap-3 rounded-2xl bg-white p-2 ring-1 ring-orange-100">
+                    {q.art ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={q.art} alt="" className="h-11 w-11 rounded-xl object-cover" />
+                    ) : (
+                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-sky-wash">🌏</span>
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold">{q.title}</span>
+                    {i > 0 && (
+                      <button className="press rounded-full px-2 py-1 text-xs font-bold text-sky-700" onClick={() => p.playNext(q.id, q.kid)}>
+                        Play next
+                      </button>
+                    )}
+                    <button
+                      className="press grid h-8 w-8 place-items-center rounded-full text-slate-400"
+                      onClick={() => p.removeFromQueue(q.id, q.kid)}
+                      aria-label={`Remove ${q.title} from the queue`}
+                    >
+                      <X size={16} weight="bold" />
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );

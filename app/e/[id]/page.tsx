@@ -295,6 +295,15 @@ function Player() {
           <span className="h-11 w-11" aria-hidden />
         </div>
 
+        {mine && player.queue.length > 0 && (
+          <div className="flex items-center gap-2 self-center rounded-full bg-white px-3 py-1.5 text-sm ring-1 ring-orange-100">
+            <ListPlus size={16} weight="bold" className="text-slate-500" />
+            <span className="max-w-[55vw] truncate font-semibold">Up next: {player.queue[0].title}</span>
+            {player.queue.length > 1 && <span className="text-slate-500">+{player.queue.length - 1}</span>}
+            <button className="font-bold text-sky-700" onClick={player.next}>Skip</button>
+          </div>
+        )}
+
         {otherPlaying && data && (
           <button
             className="btn-soft self-center py-2 text-sm"

@@ -113,3 +113,7 @@ main { animation: page-in .35s var(--ease-out) both; }
 .night .scrub::-moz-range-progress { background: var(--color-moon); }
 .night .scrub::-webkit-slider-thumb { background: var(--color-moon); border-color: var(--color-night); }
 .night .scrub::-moz-range-thumb { background: var(--color-moon); border-color: var(--color-night); }
+
+/* Now playing sheet slides up from the mini player. */
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-up { animation: sheet-up 280ms cubic-bezier(.2,.8,.2,1); }
