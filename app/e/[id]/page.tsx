@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { api, supabase } from "@/lib/supabase/browser";
 import { useSession } from "@/lib/hooks";
@@ -40,11 +40,37 @@ export default function PlayerPage() {
   );
 }
 
+const CACHE_DAYS = 6; // audio links last 7 days
+
+/** The path part of a signed audio link (the token changes every time, the file doesn't). */
+const audioPath = (url: string) => url.split("?")[0];
+
+function readCache(key: string): PlayData | null {
+  try {
+    const c = JSON.parse(localStorage.getItem(key) ?? "null") as { at: number; data: PlayData } | null;
+    return c && Date.now() - c.at < CACHE_DAYS * 864e5 ? c.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(key: string, data: PlayData) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ at: Date.now(), data }));
+  } catch {
+    // Storage full or private mode: it just loads from the server next time.
+  }
+}
+
 function Player() {
   const { id } = useParams<{ id: string }>();
   const kid = useSearchParams().get("kid");
+  const router = useRouter();
+  const cacheKey = `woe-play:${id}:${kid ?? ""}`;
   const { session } = useSession();
-  const [data, setData] = useState<PlayData | null>(null);
+  // An episode opened before shows straight away from the copy kept on this phone.
+  const [data, setData] = useState<PlayData | null>(() => (typeof window === "undefined" ? null : readCache(cacheKey)));
+  const [showTranscript, setShowTranscript] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showWords, setShowWords] = useState(false);
   const [grownUp, setGrownUp] = useState(false);
@@ -57,9 +83,17 @@ function Player() {
 
   useEffect(() => {
     if (!session) return;
+    // Always check with the server in the background (an episode can be re-recorded), but keep the
+    // audio we already have when the file is the same, so nothing reloads under the listener.
     api<PlayData>(`/api/episodes/${id}/play${kid ? `?kid=${kid}` : ""}`)
-      .then(setData)
-      .catch((e) => setError(e.message));
+      .then((fresh) => {
+        writeCache(cacheKey, fresh);
+        setData((prev) => (prev && audioPath(prev.audio.url) === audioPath(fresh.audio.url) ? { ...fresh, audio: prev.audio } : fresh));
+      })
+      .catch((e) => {
+        // With a saved copy it still plays; only show the error when there's nothing to play.
+        if (!readCache(cacheKey)) setError(e.message);
+      });
     supabase()
       .from("family_library")
       .select("favourite")
@@ -73,7 +107,7 @@ function Player() {
       .eq("heard", true)
       .limit(1)
       .then(({ data }) => setHeard(Boolean(data?.length)));
-  }, [session, id, kid]);
+  }, [session, id, kid, cacheKey]);
 
   const { load } = player;
   useEffect(() => {
@@ -174,9 +208,18 @@ function Player() {
           <div className="grid h-full place-items-center text-8xl">{cat?.emoji ?? "🌏"}</div>
         )}
         <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
-          <Link href={kid ? `/kid/${kid}` : "/library"} className="press grid h-11 w-11 place-items-center rounded-full bg-white/90 shadow" aria-label="Back">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              // Back to wherever you came from (search, a shelf, the library); the library if you opened it from a link.
+              if (window.history.length > 1) router.back();
+              else router.push("/library");
+            }}
+            className="press grid h-11 w-11 place-items-center rounded-full bg-white/90 shadow"
+            aria-label="Back"
+          >
             <ArrowLeft size={20} weight="bold" />
-          </Link>
+          </button>
           <div className="flex items-center gap-2">
             <Otto size={44} />
             <div className={playing ? "bob" : ""}><Cheko form={data.episode.cheko_form} size={44} /></div>
@@ -334,6 +377,30 @@ function Player() {
               <p className="mt-1">{data.episode.new_words.map((w) => `${w.word} (${w.say_as})`).join(", ")}</p>
             </div>
           )}
+          <div>
+            <button className="flex w-full items-center justify-between text-left" onClick={() => setShowTranscript((t) => !t)} aria-expanded={showTranscript}>
+              <h2 className="text-xl font-semibold">Transcript</h2>
+              <span className="text-sm font-semibold text-sky-700">{showTranscript ? "Hide" : "Show"}</span>
+            </button>
+            {showTranscript && (
+              <ol className="mt-2 space-y-3 text-sm">
+                {spoken
+                  .filter((c) => c.caption && !c.caption.startsWith("🎵"))
+                  .map((c, i) => (
+                    <li key={i}>
+                      <button
+                        className={`w-full text-left ${mine && time >= c.start && time < c.end ? "font-semibold text-ink" : ""}`}
+                        onClick={() => mine && player.seek(c.start)}
+                        disabled={!mine}
+                      >
+                        <span className="mr-2 font-mono text-xs text-slate-400">{clock(c.start)}</span>
+                        <span className="whitespace-pre-line">{c.caption}</span>
+                      </button>
+                    </li>
+                  ))}
+              </ol>
+            )}
+          </div>
           <div>
             <h2 className="text-xl font-semibold">Facts checked ✓</h2>
             <ul className="mt-2 space-y-2 text-sm">
