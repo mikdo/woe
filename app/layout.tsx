@@ -7,6 +7,7 @@ import { RegisterSW } from "@/components/RegisterSW";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import { BottomNav } from "@/components/BottomNav";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { RefreshBoundary } from "@/components/RefreshBoundary";
 
 export const metadata: Metadata = {
   title: "WOE! What On Earth?",
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-AU">
       <body className="min-h-dvh antialiased">
         <PlayerProvider>
-          {children}
+          <RefreshBoundary>{children}</RefreshBoundary>
           <BottomNav />
         </PlayerProvider>
         <PullToRefresh />

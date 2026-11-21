@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ArrowClockwise } from "@phosphor-icons/react";
+import { REFRESH_EVENT } from "@/components/RefreshBoundary";
 
 const TRIGGER = 80; // px of pull needed to refresh
 const MAX = 120;
@@ -21,7 +22,9 @@ export function PullToRefresh() {
   useEffect(() => {
     if (pathname?.startsWith("/e/")) return;
     const onStart = (e: TouchEvent) => {
-      start.current = window.scrollY <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null;
+      // Not inside a sheet or dialog (swiping those down closes them), and only from the very top.
+      const inSheet = e.target instanceof Element && Boolean(e.target.closest('[role="dialog"], [data-no-pull-refresh]'));
+      start.current = !inSheet && window.scrollY <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null;
       setDragging(start.current !== null);
     };
     const onMove = (e: TouchEvent) => {
@@ -42,9 +45,15 @@ export function PullToRefresh() {
       start.current = null;
       setDragging(false);
       if (pullRef.current >= TRIGGER) {
+        // Reload the page's content, not the app, so playback carries on.
         setRefreshing(true);
         setPull(TRIGGER);
-        window.location.reload();
+        window.dispatchEvent(new Event(REFRESH_EVENT));
+        setTimeout(() => {
+          setRefreshing(false);
+          pullRef.current = 0;
+          setPull(0);
+        }, 700);
       } else {
         pullRef.current = 0;
         setPull(0);
