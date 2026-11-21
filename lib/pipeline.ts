@@ -49,6 +49,7 @@ export async function findMatch(
   question: string,
   band: Band,
   familyId: string,
+  bedtime = false,
 ): Promise<{ episodeId: string; embedding: number[] } | { episodeId: null; embedding: number[] }> {
   const embedding = await embed(question);
   const { data } = await db().rpc("match_questions", {
@@ -57,9 +58,15 @@ export async function findMatch(
     for_family: familyId,
     match_count: 3,
   });
-  const candidates = ((data ?? []) as { episode_id: string; variant_text: string; similarity: number }[]).filter(
+  let candidates = ((data ?? []) as { episode_id: string; variant_text: string; similarity: number }[]).filter(
     (c) => c.similarity >= config.matchThreshold,
   );
+  // Bedtime and daytime episodes answer the same question very differently, so they never stand in for each other.
+  if (candidates.length) {
+    const { data: modes } = await db().from("episodes").select("id, bedtime").in("id", candidates.map((c) => c.episode_id));
+    const isBedtime = new Map((modes ?? []).map((m) => [m.id as string, Boolean(m.bedtime)]));
+    candidates = candidates.filter((c) => (isBedtime.get(c.episode_id) ?? false) === bedtime);
+  }
   for (const c of candidates) {
     if (c.similarity > 0.97) return { episodeId: c.episode_id, embedding };
     const judge = await claudeJson<{ same: boolean }>({
@@ -130,6 +137,7 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
   const { data: ep } = await db().from("episodes").select("*").eq("id", episodeId).single();
   if (!ep || ep.status === "ready") return;
   const band = ep.band as Band;
+  const bedtime = Boolean(ep.bedtime);
   const previous = await previousEpisode(ep.parent_episode_id as string | null);
   const started = Date.now();
   // Functions stop at 5 minutes: past ~3, hand the rest to a fresh run.
@@ -165,10 +173,10 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       if (!script) {
         await setStage(episodeId, "writing");
         costStep("script");
-        script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+        script = await claudeJson<Script>({ system: scriptSystem(band, bedtime), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
         if (!scriptLooksComplete(script)) {
           console.error("script incomplete, writing again", episodeId);
-          script = await claudeJson<Script>({ system: scriptSystem(band), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
+          script = await claudeJson<Script>({ system: scriptSystem(band, bedtime), user: scriptUser(ep.question, facts, previous), maxTokens: 32000, schema: SCRIPT_SCHEMA });
         }
         if (!scriptLooksComplete(script)) throw new Error("The script came back incomplete");
         await db().from("episodes").update({ script }).eq("id", episodeId);
@@ -272,7 +280,11 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
     });
     const art = ep.art_path
       ? Promise.resolve(ep.art_path as string)
-      : coverArt(script.art_prompt).then(async (png) => {
+      : coverArt(
+          bedtime
+            ? `${script.art_prompt} A calm night-time scene: deep blue sky, moon and stars, soft warm glowing lights, sleepy and cosy.`
+            : script.art_prompt,
+        ).then(async (png) => {
           const path = `episodes/${episodeId}/cover-${Date.now().toString(36)}.png`;
           await upload("shared", path, png, "image/png");
           return path;
@@ -301,7 +313,11 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
       const jobs: Promise<void>[] = [];
       if (script.ambience && !script.ambience_path) {
         jobs.push(
-          soundEffect(`${script.ambience}. Soft, calm, seamless background loop, no music, no voices`, 22, true)
+          soundEffect(
+            `${script.ambience}. ${bedtime ? "Very quiet, sleepy night-time, slow and even, nothing sudden" : "Soft, calm"}, seamless background loop, no music, no voices`,
+            22,
+            true,
+          )
             .then(async (b) => {
               const path = `episodes/${episodeId}/${rev}-ambience.mp3`;
               await upload("shared", path, b, "audio/mpeg");
@@ -310,11 +326,11 @@ async function produceEpisodeRun(episodeId: string): Promise<void> {
             .catch((e) => console.error("ambience failed", episodeId, e)),
         );
       }
-      const fxSegs = segments.map((sg, i) => ({ sg, i })).filter(({ sg }) => sg.fx && !sg.fx_path).slice(0, 6);
+      const fxSegs = segments.map((sg, i) => ({ sg, i })).filter(({ sg }) => sg.fx && !sg.fx_path).slice(0, bedtime ? 2 : 6);
       jobs.push(
         inBatches(fxSegs, 2, async ({ sg, i }) => {
           try {
-            const b = await soundEffect(`${sg.fx}, friendly, for a children's show`, 2.5);
+            const b = await soundEffect(bedtime ? `${sg.fx}, very soft and gentle, quiet, for a bedtime story, nothing sudden` : `${sg.fx}, friendly, for a children's show`, 2.5);
             const path = `episodes/${episodeId}/${rev}-fx-${String(i).padStart(2, "0")}.mp3`;
             await upload("shared", path, b, "audio/mpeg");
             sg.fx_path = path;
@@ -426,6 +442,15 @@ const KIT: Record<string, { prompt: string; seconds: number; music?: boolean }> 
   boing: { prompt: "Silly cartoon boing spring sound, gentle and funny", seconds: 1 },
   drumroll: { prompt: "Short soft snare drumroll building suspense, for kids, ends with a small cymbal tap", seconds: 2 },
   poof: { prompt: "Magical sparkle poof transformation sound with twinkles", seconds: 2 },
+  "theme-night": {
+    prompt:
+      "Gentle lullaby version of a children's science podcast theme called What On Earth. Soft music box, celesta and warm felt piano, " +
+      "slow and dreamy, hushed, like a starry night. Calm intro that settles into a soft final chord",
+    seconds: 12,
+    music: true,
+  },
+  "jingle-night": { prompt: "Very soft, slow lullaby sting, music box and warm felt piano, fades gently to silence", seconds: 4, music: true },
+  "transform-night": { prompt: "Very soft magical shimmer, gentle twinkling chimes drifting down, quiet and dreamy", seconds: 2 },
 };
 
 /** Makes any missing shared sounds (theme tune and stings). Safe to call often. */
@@ -488,10 +513,11 @@ export async function ensurePersonalClips(kid: Kid, episodeId: string, askedByTh
   if (existing?.intro_path === introPath && existing?.outro_path) return existing;
   const name = kid.name_say_as || kid.name;
   const band: Band = bandForAge(kid.age);
+  const bedtime = await isBedtime(episodeId);
   const rules = await pronunciationRules(kid.family_id);
   const say = (lines: { speaker: "otto" | "cheko"; text: string }[]) =>
     speak(lines.map((l) => ({ ...l, text: applyAliases(l.text, rules) })));
-  const [intro, outro] = await Promise.all([say(introLines(name, band, askedByThem)), say(outroLines(name))]);
+  const [intro, outro] = await Promise.all([say(introLines(name, band, askedByThem, bedtime)), say(outroLines(name, bedtime))]);
   await Promise.all([
     upload("personal", introPath, intro, "audio/mpeg"),
     upload("personal", outroPath, outro, "audio/mpeg"),
@@ -499,6 +525,11 @@ export async function ensurePersonalClips(kid: Kid, episodeId: string, askedByTh
   const row = { kid_id: kid.id, episode_id: episodeId, intro_path: introPath, outro_path: outroPath };
   await db().from("personal_clips").upsert(row, { onConflict: "kid_id,episode_id" });
   return row;
+}
+
+async function isBedtime(episodeId: string) {
+  const { data } = await db().from("episodes").select("bedtime").eq("id", episodeId).maybeSingle();
+  return Boolean(data?.bedtime);
 }
 
 export function joinNames(names: string[]) {
@@ -518,10 +549,11 @@ export async function ensureGroupClips(familyId: string, episodeId: string, aske
   const list = (kids ?? []) as Kid[];
   const who = joinNames(list.map((k) => k.name_say_as || k.name));
   const band: Band = bandForAge(Math.min(...list.map((k) => k.age)));
+  const bedtime = await isBedtime(episodeId);
   const rules = await pronunciationRules(familyId);
   const say = (lines: { speaker: "otto" | "cheko"; text: string }[]) =>
     speak(lines.map((l) => ({ ...l, text: applyAliases(l.text, rules) })));
-  const [intro, outro] = await Promise.all([say(introLines(who, band, askedByThem)), say(outroLines(who))]);
+  const [intro, outro] = await Promise.all([say(introLines(who, band, askedByThem, bedtime)), say(outroLines(who, bedtime))]);
   await Promise.all([
     upload("personal", introPath, intro, "audio/mpeg"),
     upload("personal", outroPath, outro, "audio/mpeg"),

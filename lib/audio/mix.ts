@@ -95,13 +95,14 @@ export class Bus {
   }
 
   /** Loops a bed under [from, to] with fades in and out. */
-  bed(loop: Float32Array, from: number, to: number, gain: number, fade = 2) {
+  bed(loop: Float32Array, from: number, to: number, gain: number, fade = 2, fadeOut = fade) {
     if (!loop.length) return;
     const s = Math.round(from * RATE);
     const e = Math.min(this.length, Math.round(to * RATE));
     const f = Math.round(fade * RATE);
+    const fo = Math.round(fadeOut * RATE);
     for (let i = s; i < e; i++) {
-      const env = Math.min(1, (i - s) / f, (e - i) / f);
+      const env = Math.min(1, (i - s) / f, (e - i) / fo);
       this.data[i] += loop[(i - s) % loop.length] * gain * env;
     }
   }

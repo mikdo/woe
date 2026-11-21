@@ -10,6 +10,9 @@
   --font-round: 'Fredoka Variable', ui-rounded, system-ui, sans-serif;
   --color-sky-wash: #cfe9f7;
   --color-ember: #e8793a;
+  --color-night: #1e2a4a;
+  --color-night-deep: #131c33;
+  --color-moon: #fde68a;
   --font-sans: 'Nunito Variable', ui-rounded, system-ui, sans-serif;
 }
 
@@ -93,3 +96,20 @@ main { animation: page-in .35s var(--ease-out) both; }
 .scrub::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -5.5px; border-radius: 50%; background: var(--color-ember); border: 3px solid white; box-shadow: 0 1px 4px rgba(0,0,0,.2); transition: transform .15s var(--spring); }
 .scrub:active::-webkit-slider-thumb { transform: scale(1.35); }
 .scrub::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--color-ember); border: 3px solid white; }
+
+/* Bedtime episodes: a dim, starry player that won't light up a dark bedroom. */
+.night { background: var(--color-night-deep); color: #e2e8f0; }
+.night .bg-cream { background: var(--color-night); }
+.night .border-ember { border-color: var(--color-moon); }
+.night .text-slate-500, .night .text-slate-400 { color: #8ea0c6; }
+.night .card { background: #26345a; color: #e2e8f0; box-shadow: none; --tw-ring-color: #33436e; }
+.night .btn-soft { background: #26345a; color: #e2e8f0; box-shadow: none; --tw-ring-color: #3b4c7a; }
+.night .btn-primary { background: #4c5fa8; box-shadow: 0 4px 0 #2f3d75; }
+.night .bg-white, .night .bg-orange-50, .night .bg-green-50 { background: #2c3b63; }
+.night .bg-white\/90 { background: rgb(30 42 74 / .85); color: #e2e8f0; }
+.night .bg-ember { background: #4c5fa8; box-shadow: 0 5px 0 #2f3d75; }
+.night .bg-ink\/25 { background: rgb(226 232 240 / .25); }
+.night .scrub::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--color-moon) var(--pct), #33436e var(--pct)); }
+.night .scrub::-moz-range-progress { background: var(--color-moon); }
+.night .scrub::-webkit-slider-thumb { background: var(--color-moon); border-color: var(--color-night); }
+.night .scrub::-moz-range-thumb { background: var(--color-moon); border-color: var(--color-night); }

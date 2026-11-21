@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const missing = missingKeys();
   if (missing.length) return Response.json({ error: `Server is missing: ${missing.join(", ")}` }, { status: 503 });
 
-  const body = (await req.json()) as { kidId?: string; text?: string; source?: "voice" | "typed"; band?: Band; parentEpisodeId?: string };
+  const body = (await req.json()) as { kidId?: string; text?: string; source?: "voice" | "typed"; band?: Band; parentEpisodeId?: string; bedtime?: boolean };
   const text = (body.text ?? "").trim().slice(0, 300);
   if (!text) return Response.json({ error: "No question" }, { status: 400 });
 
@@ -49,6 +49,7 @@ export async function POST(req: Request) {
       status,
       triage_reason: t.verdict === "unclear" ? `unclear: ${t.reason}` : t.reason,
       parent_episode_id: parentId,
+      bedtime: Boolean(body.bedtime),
     })
     .select("id")
     .single();
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
     category: t.category,
     chekoForm: t.cheko_form,
     parentEpisodeId: parentId,
+    bedtime: Boolean(body.bedtime),
   });
   return Response.json({ ...result, question: t.question });
 }

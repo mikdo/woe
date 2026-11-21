@@ -20,6 +20,6 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
   const question = (body.text ?? ask.text).trim().slice(0, 300);
   await db().from("asks").update({ text: question, status: "triage" }).eq("id", id);
-  const result = await proceedAsk({ askId: id, family: auth.family, question, band: ask.band as Band, parentEpisodeId: ask.parent_episode_id });
+  const result = await proceedAsk({ askId: id, family: auth.family, question, band: ask.band as Band, parentEpisodeId: ask.parent_episode_id, bedtime: Boolean(ask.bedtime) });
   return Response.json(result);
 }

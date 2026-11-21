@@ -73,6 +73,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     introPath: clips?.intro_path ?? null,
     outroPath: clips?.outro_path ?? null,
     hello,
+    bedtime: Boolean(ep.bedtime),
   });
   const url = await signedUrl(mix.path);
   if (!url) return Response.json({ error: "Couldn't load the audio" }, { status: 500 });
@@ -101,6 +102,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       category: ep.category,
       cheko_form: ep.cheko_form,
       band: ep.band,
+      bedtime: Boolean(ep.bedtime),
       art_url: ep.art_path ? publicUrl(ep.art_path) : null,
       talk_about_it: ep.talk_about_it ?? [],
       new_words: script.new_words ?? [],

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle, Star } from "@phosphor-icons/react";
+import { CheckCircle, MoonStars, Star } from "@phosphor-icons/react";
 import { BANDS, CATEGORIES } from "@/lib/types";
 
 export type EpisodeLite = {
@@ -11,6 +11,7 @@ export type EpisodeLite = {
   cheko_form: string | null;
   status: string;
   band?: string | null;
+  bedtime?: boolean | null;
   favourite?: boolean;
   /** Listened to by anyone in the family. */
   heard?: boolean;
@@ -38,6 +39,14 @@ export function EpisodeCard({ episode, href }: { episode: EpisodeLite; href: str
         {episode.favourite && (
           <span className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-amber-400 shadow">
             <Star size={18} weight="fill" />
+          </span>
+        )}
+        {episode.bedtime && (
+          <span
+            className={`absolute right-2 grid h-8 w-8 place-items-center rounded-full bg-night text-moon shadow ${episode.favourite ? "top-12" : "top-2"}`}
+            aria-label="Bedtime story"
+          >
+            <MoonStars size={18} weight="fill" />
           </span>
         )}
         {episode.heard && (

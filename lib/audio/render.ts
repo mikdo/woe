@@ -13,6 +13,8 @@ const THEME_GAIN = 0.8;
 const FX_GAIN = 0.55;
 const STING_GAIN = 0.7;
 const BED_GAIN = 0.085;
+// Bedtime: slower, no game stings, lullaby theme and stings, and a sleepy soundscape that carries on after the goodbye and fades away.
+const NIGHT = { gap: 0.65, bedGain: 0.13, tail: 30, tailFade: 22, themeGain: 0.6 };
 // Beats that open a new part of the show get a little whoosh.
 const WHOOSH_BEFORE = new Set(["framing", "recap", "final_answer", "teaser", "signoff"]);
 
@@ -53,18 +55,25 @@ export async function ensureMix(opts: {
   introPath: string | null;
   outroPath: string | null;
   hello: string;
+  bedtime?: boolean;
 }): Promise<Mix> {
   const { episodeId, script, listenerPath } = opts;
+  const night = Boolean(opts.bedtime);
+  const gap = night ? NIGHT.gap : GAP;
   const segs = script.segments.filter((s) => s.audio_path);
   // Any re-recorded segment changes the key, so edited episodes get a fresh mix.
   const rev = createHash("sha1").update(segs.map((s) => s.audio_path).join("|")).digest("hex").slice(0, 10);
-  const base = `${listenerPath}/${episodeId}-${MIX_VERSION}-${rev}${opts.introPath ? "" : "-plain"}`;
+  const base = `${listenerPath}/${episodeId}-${MIX_VERSION}-${rev}${night ? "-night" : ""}${opts.introPath ? "" : "-plain"}`;
   const cached = await fetchFile("personal", `${base}.json`);
   if (cached) return JSON.parse(cached.toString()) as Mix;
 
   const kitNames = ["theme", "jingle", "ding", "boing", "drumroll", "poof", "transform", "whoosh"];
+  // At night the theme, jingle and transform use their lullaby versions (falling back to the day ones until they're made).
+  const nightly = new Set(["theme", "jingle", "transform"]);
+  const loadKit = async (k: string) =>
+    (night && nightly.has(k) ? await load("shared", `kit/${k}-night.mp3`, k !== "theme") : null) ?? load("shared", `kit/${k}.mp3`, k !== "theme");
   const [kitList, intro, outro, bed, ...voices] = await Promise.all([
-    Promise.all(kitNames.map((k) => load("shared", `kit/${k}.mp3`, k !== "theme"))),
+    Promise.all(kitNames.map(loadKit)),
     load("personal", opts.introPath),
     load("personal", opts.outroPath),
     load("shared", script.ambience_path, false),
@@ -80,7 +89,7 @@ export async function ensureMix(opts: {
   // Theme, with Otto coming in over its last moment.
   let bedFrom = 0;
   if (kit.theme) {
-    const end = bus.add(kit.theme, t, THEME_GAIN);
+    const end = bus.add(kit.theme, t, night ? NIGHT.themeGain : THEME_GAIN);
     cues.push({ start: t, end, caption: "🎵 What On Earth!", kind: "theme" });
     t = Math.max(t + 1, end - 0.9);
     bedFrom = end - 2;
@@ -90,7 +99,7 @@ export async function ensureMix(opts: {
     if (!clip) return;
     const end = bus.add(clip, t, 1);
     cues.push({ start: t, end, caption: cap, kind });
-    t = end + GAP;
+    t = end + gap;
   };
   const sting = (name: string, gain = STING_GAIN, overlap = 0.15) => {
     const clip = kit[name];
@@ -107,9 +116,9 @@ export async function ensureMix(opts: {
     if (i === 0 && seg.beat !== "hello" && intro) voice(intro, `Today's question, ${opts.hello}!`, "intro");
 
     const isGame = seg.beat.startsWith("game");
-    if (WHOOSH_BEFORE.has(seg.beat) || (isGame && firstGame)) sting("whoosh", 0.5, 0.25);
+    if (!night && (WHOOSH_BEFORE.has(seg.beat) || (isGame && firstGame))) sting("whoosh", 0.5, 0.25);
     if (isGame) firstGame = false;
-    if (seg.sfx && ["drumroll", "ding", "boing"].includes(seg.sfx)) sting(seg.sfx);
+    if (!night && seg.sfx && ["drumroll", "ding", "boing"].includes(seg.sfx)) sting(seg.sfx);
 
     const fx = fxs[i];
     if (fx) {
@@ -118,19 +127,26 @@ export async function ensureMix(opts: {
       t += lead;
     }
     voice(voices[i], segCaption(seg), seg.beat);
-    if (seg.transform_after) sting("transform", 0.75, 0.35);
+    if (seg.transform_after) sting("transform", night ? 0.45 : 0.75, 0.35);
 
     const pause = pauseFor(seg);
     if (pause > 0) {
-      cues.push({ start: t - GAP, end: t - GAP + pause, caption: "🤔 What do you think?", kind: "think", think: true });
+      cues.push({ start: t - gap, end: t - gap + pause, caption: "🤔 What do you think?", kind: "think", think: true });
       t += pause;
     }
   });
 
   voice(outro, `Bye, ${opts.hello}!`, "outro");
-  sting("jingle", 0.75, 0);
-  bus.extend(t + 0.6);
-  if (bed) bus.bed(bed, Math.max(0, bedFrom), t - 0.2, BED_GAIN, 2.5);
+  sting("jingle", night ? 0.5 : 0.75, 0);
+  if (night && bed) {
+    // The soundscape keeps going after the goodbye and slowly fades out.
+    bus.extend(t + NIGHT.tail);
+    bus.bed(bed, Math.max(0, bedFrom), t + NIGHT.tail, NIGHT.bedGain, 3, NIGHT.tailFade);
+    cues.push({ start: t, end: t + NIGHT.tail, caption: "🌙 Sweet dreams…", kind: "night" });
+  } else {
+    bus.extend(t + 0.6);
+    if (bed) bus.bed(bed, Math.max(0, bedFrom), t - 0.2, BED_GAIN, 2.5);
+  }
 
   const mp3 = await encode(bus.out());
   const mix: Mix = { path: `${base}.mp3`, duration: bus.length / 44100, cues };

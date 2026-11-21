@@ -8,7 +8,7 @@ import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
 import { InTheWorks } from "@/components/InTheWorks";
 import { Art, PillSelect } from "@/components/SkyPage";
 
-const FIELDS = "id, title, question, category, art_path, cheko_form, status, band";
+const FIELDS = "id, title, question, category, art_path, cheko_form, status, band, bedtime";
 type Heard = "any" | "new" | "heard";
 
 export default function Library() {

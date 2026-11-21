@@ -11,7 +11,7 @@ import { GrownUpGate, isGrownUpUnlocked } from "@/components/GrownUpGate";
 import { EpisodeCard, type EpisodeLite } from "@/components/EpisodeCard";
 import { Art, PillSelect } from "@/components/SkyPage";
 import { BANDS } from "@/lib/types";
-import { ArrowLeft, Keyboard, Microphone, Stop } from "@phosphor-icons/react";
+import { ArrowLeft, Keyboard, Microphone, MoonStars, Stop } from "@phosphor-icons/react";
 import { defaultAskBand, type Band } from "@/lib/types";
 
 type Phase =
@@ -54,6 +54,11 @@ export default function KidPage() {
   const [bandChoice, setBandChoice] = useState<Band | null>(null);
   // "Ask more about this": a follow-up to an episode (from the player).
   const [follow, setFollow] = useState<{ id: string; title: string } | null>(null);
+  // Bedtime story mode is on by default in the evening (6pm to 6am).
+  const [bedtime, setBedtime] = useState(() => {
+    const h = new Date().getHours();
+    return h >= 18 || h < 6;
+  });
 
   useEffect(() => {
     if (!session) return;
@@ -80,7 +85,7 @@ export default function KidPage() {
   const loadShelf = useCallback(async () => {
     let q = supabase()
       .from("family_library")
-      .select("favourite, episodes(id, title, question, category, art_path, cheko_form, status, band)")
+      .select("favourite, episodes(id, title, question, category, art_path, cheko_form, status, band, bedtime)")
       .order("added_at", { ascending: false })
       .limit(24);
     if (kidId !== "all") q = q.eq("kid_id", kidId);
@@ -134,7 +139,7 @@ export default function KidPage() {
     try {
       const r = await api<{ askId: string; status: string; episodeId?: string; reason?: string }>("/api/ask", {
         method: "POST",
-        body: JSON.stringify({ kidId, text, source, band, parentEpisodeId: follow?.id }),
+        body: JSON.stringify({ kidId, text, source, band, parentEpisodeId: follow?.id, bedtime }),
       });
       setFollow(null);
       handleStatus(r.askId, r.status, r.episodeId ?? null, r.reason);
@@ -273,6 +278,17 @@ export default function KidPage() {
               <Microphone size={84} weight="fill" />
             </button>
             <p className="text-slate-500">Tap and ask Otto anything</p>
+            <button
+              type="button"
+              aria-pressed={bedtime}
+              onClick={() => setBedtime((b) => !b)}
+              className={`press flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold ring-1 ${
+                bedtime ? "bg-night text-moon ring-night" : "bg-white text-slate-500 ring-slate-200"
+              }`}
+            >
+              <MoonStars size={18} weight={bedtime ? "fill" : "bold"} />
+              {bedtime ? "Bedtime story: on" : "Bedtime story"}
+            </button>
             <button className="btn-soft py-2 text-sm" onClick={() => (isGrownUpUnlocked() ? setTyped("") : setGate(true))}>
               <Keyboard size={18} weight="bold" /> Grown-up types it
             </button>

@@ -16,6 +16,7 @@ type PlayData = {
     question: string;
     category: string | null;
     cheko_form: string | null;
+    bedtime?: boolean;
     art_url: string | null;
     talk_about_it: string[];
     new_words: { word: string; say_as: string }[];
@@ -133,6 +134,7 @@ function Player() {
   }
   if (!data) return null;
   const cat = CATEGORIES.find((c) => c.id === data.episode.category);
+  const night = Boolean(data.episode.bedtime);
 
   const pct = duration ? Math.min(100, (time / duration) * 100) : 0;
   const onTouchStart = (e: React.TouchEvent) => setTouchY(e.touches[0].clientY);
@@ -145,7 +147,7 @@ function Player() {
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col bg-cream">
+    <main className={`mx-auto flex min-h-dvh max-w-xl flex-col bg-cream ${night ? "night" : ""}`}>
       {/* Full-bleed cover art. Pull the sheet down to see all of it (find Cheko!). */}
       <div
         className="relative overflow-hidden transition-[height] duration-500 ease-out"
@@ -184,7 +186,12 @@ function Player() {
 
         <div className="text-center">
           <h1 className="text-2xl font-bold leading-tight">{data.episode.title}</h1>
-          {cat && <p className="mt-1 text-sm font-semibold text-slate-500">{cat.emoji} {cat.label}</p>}
+          {cat && (
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {night ? "🌙 Bedtime story · " : ""}
+              {cat.emoji} {cat.label}
+            </p>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -230,7 +237,7 @@ function Player() {
           🤔 What do you think? <span className="text-base text-slate-500 underline">skip</span>
         </button>
       )}
-      {done && <p className="celebrate text-center font-display text-xl font-bold">Keep wondering! 🌏</p>}
+      {done && <p className="celebrate text-center font-display text-xl font-bold">{night ? "Sweet dreams 🌙" : "Keep wondering! 🌏"}</p>}
 
       <section className="card space-y-3">
         <h2 className="text-xl font-semibold">Wonder more 🎩</h2>

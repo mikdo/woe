@@ -61,7 +61,32 @@ const BAND_RULES: Record<Band, string> = {
 - Pauses after questions to the child: 2 seconds.`,
 };
 
-export function scriptSystem(band: Band) {
+const BEDTIME_RULES = `BEDTIME STORY MODE (this overrides anything above that conflicts with it)
+This episode is played at bedtime, in a dark room, to help a child wind down and fall asleep. Same facts and the same layered explaining, told slowly and gently.
+- Length and pace: about 20% fewer words than the age band says. Short, gentle sentences, lots of calm pictures.
+- Voice: Otto speaks softly, like reading a bedtime story. Use [softly] and [whispers] tags often; never [excited], never shouting, no capitals for emphasis.
+- Hello: Otto: "Hello, hello... welcome to What On Earth. I'm Otto." Cheko says a sleepy hi. No "Hey hey!".
+- Hook: no shouting "WHOA!" prompt. Otto wonders the question aloud, slowly. Cheko still transforms once, into something soft, sleepy and a little bit funny
+  that fits the topic (a dozy koala in a nightcap, a drifting cloud that keeps yawning, a little owl in slippers, a glowing firefly).
+  His "Cheko... change-o." is said softly (lower case, no exclamation mark). He stays that way, goodbye included.
+- The Wonder Hat doesn't SPIN, it floats. Otto: "Wonder Hat... float." Leave fx null for the float. The trip happens at night or dusk:
+  moonlight, stars, quiet places, animals settling down. Float home again before the recap.
+- No cliffhangers, no suspense, no scary or exciting moments, no loud animals or crashes. Danger topics are told from far away and reassuringly.
+- Games: ONE only, a soft "game_tf" with 2 statements, said quietly. No drumroll, ding or boing: sfx null throughout, except "jingle" on the sign-off.
+- Prompts to the child are cosy and still: "Can you wiggle your toes under the blanket?", "Take a big slow breath like a whale." No jumping, stomping or running.
+- Ask-pause-answer 2 or 3 times only. Pauses 2 seconds.
+- Recap: slow, one line per idea, like counting sheep.
+- After the final answer, instead of a teaser, a WIND-DOWN: 3-4 short, slow lines from Otto that tie the topic to sleep
+  (the stars are still shining, the whales are resting too, everything is quiet now). Use beat "teaser" for it; it must not ask a question.
+- Sign-off: Otto whispers "Keep wondering, and keep asking... what on earth?" Cheko whispers "whoa..." then "Goodnight." No activity mention.
+- Keep the warmth, drop the laugh-out-loud jokes and grown-up winks. A gentle smile is fine.
+- sound effects: at most 2 fx, and only soft natural sounds (gentle waves, crickets, a soft breeze). Never sudden.
+- ambience: a night soundscape for the destination (crickets and a soft breeze, slow waves at night, rain on a roof). Very calm.
+- art_prompt: the destination at night or dusk: moon, stars, soft warm lights, deep blue sky. Cheko hidden in his sleepy form.
+- activities: still 3, but calm ones for right now in bed or for tomorrow (a quiet "explore" like listening for night sounds,
+  a slow "move" like stretching like a cat, a "draw" for the morning).`;
+
+export function scriptSystem(band: Band, bedtime = false) {
   return `You write episodes of "What On Earth?" (WOE!, said "Whoa!"), a warm, slow-paced Australian science audio show.
 
 CAST
@@ -165,7 +190,7 @@ Return ONLY JSON:
  "segments":[{"beat":"hello","lines":[{"speaker":"otto","text":"..."},{"speaker":"cheko","text":"..."}],"facts":[],"pause_after_s":0,"sfx":null,"fx":null,"answer":null}],
  "ambience":"...",
  "art_prompt":"...","talk_about_it":["...","...","..."],"follow_ups":["...","...","..."],"grownup_fact":"...",
- "activities":[{"kind":"make","title":"...","minutes":10,"need":["..."],"steps":["...","..."],"talk":"...","safety":null}]}`;
+ "activities":[{"kind":"make","title":"...","minutes":10,"need":["..."],"steps":["...","..."],"talk":"...","safety":null}]}${bedtime ? `\n\n${BEDTIME_RULES}` : ""}`;
 }
 
 export type PreviousEpisode = { title: string; question: string; learned: string };
@@ -218,7 +243,18 @@ names of the hosts (Otto, Cheko) or the show, or words in capitals. Most scripts
 Give a simple respelling in lower case with hyphens between syllables, no capitals (e.g. "Tyrannosaurus" -> "tie-ran-oh-sor-us").
 Return ONLY JSON: {"words":[{"word":"...","alias":"..."}]} (empty list is fine).`;
 
-export function introLines(name: string, band: Band, askedByThem: boolean) {
+export function introLines(name: string, band: Band, askedByThem: boolean, bedtime = false) {
+  if (bedtime) {
+    return [
+      {
+        speaker: "otto" as const,
+        text: askedByThem
+          ? `[softly] And ${name}... tonight's question comes from you.`
+          : `[softly] ${name}, tonight's question is one lots of sleepy wonderers have asked.`,
+      },
+      { speaker: "cheko" as const, text: `[whispers] Ooh... a cosy one.` },
+    ];
+  }
   // Plays straight after Otto's "Hey hey! Welcome to What On Earth!", so no second greeting.
   const otto = askedByThem
     ? `And guess what, ${name}? Today's question comes from... YOU!`
@@ -230,7 +266,13 @@ export function introLines(name: string, band: Band, askedByThem: boolean) {
   ];
 }
 
-export function outroLines(name: string) {
+export function outroLines(name: string, bedtime = false) {
+  if (bedtime) {
+    return [
+      { speaker: "otto" as const, text: `[whispers] Goodnight, ${name}. Sweet dreams.` },
+      { speaker: "cheko" as const, text: `[whispers] Night night, ${name}...` },
+    ];
+  }
   return [
     { speaker: "otto" as const, text: `Great listening, ${name}! Super curious work.` },
     { speaker: "cheko" as const, text: `Bye ${name}! Keep wondering!` },
